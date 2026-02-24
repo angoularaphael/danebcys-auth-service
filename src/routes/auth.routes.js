@@ -1,0 +1,22 @@
+const { Router } = require('express');
+const controller = require('../controllers/auth.controller');
+const { authenticate } = require('../middlewares/auth');
+const { verifyPow } = require('../middlewares/pow');
+const { tokenLimiter, preAuthTokenLimiter, challengeLimiter } = require('../middlewares/rateLimiter');
+
+const router = Router();
+
+router.get('/pow-challenge', challengeLimiter, controller.getChallenge);
+
+router.post('/signup', verifyPow, controller.signup);
+router.post('/login', verifyPow, controller.login);
+router.post('/forgot-password', verifyPow, controller.forgotPassword);
+router.post('/reset-password', verifyPow, controller.resetPassword);
+
+router.post('/refresh', preAuthTokenLimiter, controller.refresh);
+
+router.post('/logout', authenticate, tokenLimiter, controller.logout);
+router.get('/me', authenticate, tokenLimiter, controller.getMe);
+router.post('/verify-email', authenticate, tokenLimiter, controller.verifyEmail);
+
+module.exports = router;

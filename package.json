@@ -1,0 +1,31 @@
+{
+  "name": "auth-service",
+  "version": "1.0.0",
+  "description": "Service d'authentification — JWT maison, double pepper, PoW, zero lib auth",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "db:init": "node -e \"require('dotenv').config();require('./src/config/database').initDB().then(() => process.exit(0)).catch((e) => {console.error(e);process.exit(1)})\""
+  },
+  "restrictions": {
+    "forbidden": [
+      "jsonwebtoken",
+      "express-rate-limit",
+      "express-session",
+      "passport",
+      "any rate-limiting library",
+      "any session management library",
+      "any proof-of-work library"
+    ],
+    "reason": "Tout est implémenté à la main avec le module natif crypto de Node.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "nodemailer": "^6.9.16",
+    "pg": "^8.13.1"
+  }
+}
