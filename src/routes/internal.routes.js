@@ -22,7 +22,10 @@ router.post('/validate-token', serviceAuth, async (req, res) => {
     const payload = jwt.verify(accessToken, env.JWT_ACCESS_SECRET);
 
     const result = await query(
-      'SELECT id, email, role FROM users WHERE id = $1 AND deleted = FALSE',
+      `SELECT u.id, u.email, u.role_id, r.name AS role
+       FROM users u
+       JOIN roles r ON u.role_id = r.id
+       WHERE u.id = $1 AND u.deleted = FALSE`,
       [payload.sub]
     );
 

@@ -82,6 +82,12 @@
     }
     .form-group input:focus { border-color: #58a6ff; }
 
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
     .btn {
       padding: 8px 16px;
       border: none;
@@ -165,6 +171,7 @@
 
     @media (max-width: 768px) {
       .container { grid-template-columns: 1fr; }
+      .form-row { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -183,24 +190,36 @@
     <div class="card">
       <h2><span class="badge post">POST</span> /signup — Inscription</h2>
       <div class="form-group">
-        <label>Email</label>
+        <label>Nom d'utilisateur *</label>
+        <input type="text" id="signup-username" placeholder="jean_dupont">
+      </div>
+      <div class="form-group">
+        <label>Email *</label>
         <input type="email" id="signup-email" placeholder="jean@example.com">
       </div>
       <div class="form-group">
-        <label>Mot de passe (min 8 car.)</label>
+        <label>Mot de passe (min 8 car.) *</label>
         <input type="password" id="signup-password" placeholder="motDePasse123">
       </div>
-      <div class="form-group">
-        <label>Prénom</label>
-        <input type="text" id="signup-firstname" placeholder="Jean">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Prénom</label>
+          <input type="text" id="signup-firstname" placeholder="Jean">
+        </div>
+        <div class="form-group">
+          <label>Nom</label>
+          <input type="text" id="signup-lastname" placeholder="Dupont">
+        </div>
       </div>
-      <div class="form-group">
-        <label>Nom</label>
-        <input type="text" id="signup-lastname" placeholder="Dupont">
-      </div>
-      <div class="form-group">
-        <label>Téléphone (optionnel)</label>
-        <input type="text" id="signup-phone" placeholder="+33612345678">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Téléphone</label>
+          <input type="text" id="signup-phone" placeholder="+33612345678">
+        </div>
+        <div class="form-group">
+          <label>Pays</label>
+          <input type="text" id="signup-country" placeholder="France">
+        </div>
       </div>
       <button class="btn btn-primary" id="btn-signup">Inscription</button>
       <div class="pow-status mt-8" id="signup-pow-status">PoW : en attente</div>
@@ -250,7 +269,7 @@
         <label>Code à 6 chiffres (reçu par email)</label>
         <input type="text" id="verify-code" placeholder="482619" maxlength="6">
       </div>
-      <button class="btn btn-primary" id="btn-verify">Vérifier</button>
+      <button class="btn btn-primary" id="btn-verify">Vérifier email</button>
     </div>
 
     <!-- FORGOT PASSWORD -->

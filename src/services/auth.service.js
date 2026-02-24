@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const { query } = require('../config/database');
-const { hashPassword, verifyPassword } = require('../utils/hash');
+const { hashPassword, verifyPassword, createFingerprint } = require('../utils/hash');
 const { getPepper } = require('./pepper.service');
 const tokenService = require('./token.service');
 const mailService = require('./mail.service');
@@ -10,23 +10,37 @@ function generateCode() {
   return crypto.randomInt(100000, 999999).toString();
 }
 
-async function signup({ email, password, firstName, lastName, phone }) {
-  const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
+async function signup({ email, password, username, firstName, lastName, phone, country }, { userAgent, clientIp } = {}) {
+  const existing = await query(
+    'SELECT id FROM users WHERE email = $1 AND deleted = FALSE',
+    [email]
+  );
   if (existing.rows.length > 0) {
     throw new ConflictError('Un compte avec cet email existe déjà');
   }
 
+  const existingUsername = await query(
+    'SELECT id FROM users WHERE username = $1 AND deleted = FALSE',
+    [username]
+  );
+  if (existingUsername.rows.length > 0) {
+    throw new ConflictError('Ce nom d\'utilisateur est déjà pris');
+  }
+
   const pepper = getPepper();
-  const passwordHash = await hashPassword(password, pepper);
+  const { salt, hash } = await hashPassword(password, pepper);
 
   const result = await query(
-    `INSERT INTO users (email, phone, password_hash, first_name, last_name)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, email, phone, first_name, last_name, email_verified, role, created_at`,
-    [email, phone || null, passwordHash, firstName, lastName]
+    `INSERT INTO users (username, email, phone, password_hash, salt, first_name, last_name, country)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id, username, email, phone, first_name, last_name,
+               email_verified, phone_verified, role_id, premium_level,
+               country, created_at`,
+    [username, email, phone || null, hash, salt, firstName || null, lastName || null, country || null]
   );
 
   const user = result.rows[0];
+  user.role_name = 'user';
 
   const code = generateCode();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
@@ -39,16 +53,23 @@ async function signup({ email, password, firstName, lastName, phone }) {
     console.error('[auth] Erreur envoi email de vérification:', err.message);
   });
 
-  const accessToken = tokenService.generateAccessToken(user);
+  const fingerprintHash = createFingerprint(userAgent);
+  const accessToken = tokenService.generateAccessToken({ id: user.id, email: user.email, role: 'user' });
   const refreshToken = tokenService.generateRefreshToken();
-  await tokenService.storeRefreshToken(user.id, refreshToken);
+  await tokenService.storeRefreshToken(user.id, refreshToken, {
+    fingerprintHash,
+    ipAddress: clientIp
+  });
 
   return { user: formatUser(user), accessToken, refreshToken };
 }
 
-async function login({ email, password }) {
+async function login({ email, password }, { userAgent, clientIp } = {}) {
   const result = await query(
-    'SELECT * FROM users WHERE email = $1 AND deleted = FALSE',
+    `SELECT u.*, r.name AS role_name
+     FROM users u
+     JOIN roles r ON u.role_id = r.id
+     WHERE u.email = $1 AND u.deleted = FALSE`,
     [email]
   );
 
@@ -58,20 +79,29 @@ async function login({ email, password }) {
 
   const user = result.rows[0];
   const pepper = getPepper();
-  const valid = await verifyPassword(password, user.password_hash, pepper);
+  const valid = await verifyPassword(password, user.password_hash, user.salt, pepper);
 
   if (!valid) {
     throw new UnauthorizedError('Email ou mot de passe incorrect');
   }
 
-  const accessToken = tokenService.generateAccessToken(user);
+  await query(
+    'UPDATE users SET last_login_at = NOW() WHERE id = $1',
+    [user.id]
+  );
+
+  const fingerprintHash = createFingerprint(userAgent);
+  const accessToken = tokenService.generateAccessToken({ id: user.id, email: user.email, role: user.role_name });
   const refreshToken = tokenService.generateRefreshToken();
-  await tokenService.storeRefreshToken(user.id, refreshToken);
+  await tokenService.storeRefreshToken(user.id, refreshToken, {
+    fingerprintHash,
+    ipAddress: clientIp
+  });
 
   return { user: formatUser(user), accessToken, refreshToken };
 }
 
-async function refresh(oldRefreshToken) {
+async function refresh(oldRefreshToken, { userAgent, clientIp } = {}) {
   let user;
   try {
     user = await tokenService.rotateRefreshToken(oldRefreshToken);
@@ -88,9 +118,13 @@ async function refresh(oldRefreshToken) {
     throw new UnauthorizedError('Refresh token invalide ou expiré');
   }
 
+  const fingerprintHash = createFingerprint(userAgent);
   const accessToken = tokenService.generateAccessToken(user);
   const newRefreshToken = tokenService.generateRefreshToken();
-  await tokenService.storeRefreshToken(user.id, newRefreshToken);
+  await tokenService.storeRefreshToken(user.id, newRefreshToken, {
+    fingerprintHash,
+    ipAddress: clientIp
+  });
 
   return { accessToken, refreshToken: newRefreshToken };
 }
@@ -101,9 +135,13 @@ async function logout(refreshToken) {
 
 async function getMe(userId) {
   const result = await query(
-    `SELECT id, email, phone, first_name, last_name, email_verified,
-            phone_verified, role, created_at, updated_at
-     FROM users WHERE id = $1 AND deleted = FALSE`,
+    `SELECT u.id, u.username, u.email, u.phone, u.first_name, u.last_name,
+            u.email_verified, u.phone_verified, u.role_id, r.name AS role_name,
+            u.premium_level, u.student_proof, u.country,
+            u.created_at, u.updated_at, u.last_login_at
+     FROM users u
+     JOIN roles r ON u.role_id = r.id
+     WHERE u.id = $1 AND u.deleted = FALSE`,
     [userId]
   );
 
@@ -124,21 +162,25 @@ async function verifyEmail(userId, code) {
   }
 
   await query('UPDATE email_verifications SET used = TRUE WHERE id = $1', [result.rows[0].id]);
-  await query('UPDATE users SET email_verified = TRUE, updated_at = NOW() WHERE id = $1', [userId]);
+  await query('UPDATE users SET email_verified = TRUE WHERE id = $1', [userId]);
 }
 
 function formatUser(row) {
   return {
     id: row.id,
+    username: row.username,
     email: row.email,
     phone: row.phone,
     firstName: row.first_name,
     lastName: row.last_name,
     emailVerified: row.email_verified,
     phoneVerified: row.phone_verified,
-    role: row.role,
+    role: row.role_name || 'user',
+    premiumLevel: row.premium_level,
+    country: row.country,
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    lastLoginAt: row.last_login_at
   };
 }
 
@@ -148,7 +190,6 @@ async function forgotPassword(email) {
     [email]
   );
 
-  // Ne pas révéler si l'email existe ou non
   if (result.rows.length === 0) return;
 
   const user = result.rows[0];
@@ -182,12 +223,12 @@ async function resetPassword(email, code, newPassword) {
 
   const { reset_id, user_id } = result.rows[0];
   const pepper = getPepper();
-  const passwordHash = await hashPassword(newPassword, pepper);
+  const { salt, hash } = await hashPassword(newPassword, pepper);
 
   await query('UPDATE password_resets SET used = TRUE WHERE id = $1', [reset_id]);
   await query(
-    'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
-    [passwordHash, user_id]
+    'UPDATE users SET password_hash = $1, salt = $2 WHERE id = $3',
+    [hash, salt, user_id]
   );
 
   await tokenService.revokeAllUserTokens(user_id);

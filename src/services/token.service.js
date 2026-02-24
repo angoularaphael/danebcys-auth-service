@@ -23,22 +23,23 @@ function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-async function storeRefreshToken(userId, token) {
+async function storeRefreshToken(userId, token, { fingerprintHash, ipAddress } = {}) {
   const tokenHash = hashToken(token);
   const expiresAt = new Date(Date.now() + parseDurationMs(env.JWT_REFRESH_EXPIRES_IN));
 
   await query(
-    'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
-    [userId, tokenHash, expiresAt]
+    `INSERT INTO sessions (user_id, token_hash, fingerprint_hash, ip_address, expires_at)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [userId, tokenHash, fingerprintHash || null, ipAddress || null, expiresAt]
   );
 }
 
 /**
- * Rotation de token avec détection de réutilisation.
+ * Rotation de token avec détection de réutilisation (CDC 4.2).
  *
  * Flux :
- *  1. Le token existe et n'est PAS revoked → on le marque revoked, on retourne le user
- *  2. Le token existe et EST revoked → réutilisation détectée !
+ *  1. Le token existe et n'est PAS invalidated → on le marque invalidated, on retourne le user
+ *  2. Le token existe et EST invalidated → réutilisation détectée !
  *     → on supprime TOUS les tokens du user (toutes ses sessions)
  *     → on lance TOKEN_REUSE_DETECTED
  *  3. Le token n'existe pas ou est expiré → retourne null
@@ -47,11 +48,12 @@ async function rotateRefreshToken(token) {
   const tokenHash = hashToken(token);
 
   const result = await query(
-    `SELECT rt.id, rt.user_id, rt.revoked, rt.expires_at,
-            u.id AS uid, u.email, u.role, u.deleted
-     FROM refresh_tokens rt
-     JOIN users u ON rt.user_id = u.id
-     WHERE rt.token_hash = $1`,
+    `SELECT s.id, s.user_id, s.invalidated, s.expires_at, s.fingerprint_hash,
+            u.id AS uid, u.email, u.role_id, r.name AS role_name, u.deleted
+     FROM sessions s
+     JOIN users u ON s.user_id = u.id
+     JOIN roles r ON u.role_id = r.id
+     WHERE s.token_hash = $1`,
     [tokenHash]
   );
 
@@ -59,8 +61,8 @@ async function rotateRefreshToken(token) {
 
   const row = result.rows[0];
 
-  if (row.revoked) {
-    await query('DELETE FROM refresh_tokens WHERE user_id = $1', [row.user_id]);
+  if (row.invalidated) {
+    await query('DELETE FROM sessions WHERE user_id = $1', [row.user_id]);
     const err = new Error('TOKEN_REUSE_DETECTED');
     err.userId = row.user_id;
     throw err;
@@ -69,18 +71,21 @@ async function rotateRefreshToken(token) {
   if (new Date(row.expires_at) < new Date()) return null;
   if (row.deleted) return null;
 
-  await query('UPDATE refresh_tokens SET revoked = TRUE WHERE id = $1', [row.id]);
+  await query(
+    'UPDATE sessions SET invalidated = TRUE, last_used_at = NOW() WHERE id = $1',
+    [row.id]
+  );
 
-  return { id: row.uid, email: row.email, role: row.role };
+  return { id: row.uid, email: row.email, role: row.role_name };
 }
 
 async function revokeRefreshToken(token) {
   const tokenHash = hashToken(token);
-  await query('DELETE FROM refresh_tokens WHERE token_hash = $1', [tokenHash]);
+  await query('DELETE FROM sessions WHERE token_hash = $1', [tokenHash]);
 }
 
 async function revokeAllUserTokens(userId) {
-  await query('DELETE FROM refresh_tokens WHERE user_id = $1', [userId]);
+  await query('DELETE FROM sessions WHERE user_id = $1', [userId]);
 }
 
 function parseDurationMs(duration) {

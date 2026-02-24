@@ -4,7 +4,7 @@ const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1, keyLength: 64 };
 
 /**
  * Hash un mot de passe avec scrypt + salt + pepper.
- * Format retourné : "salt_hex:derived_key_hex"
+ * Retourne { salt, hash } séparément (CDC : salt stocké en colonne dédiée).
  */
 function hashPassword(password, pepper) {
   return new Promise((resolve, reject) => {
@@ -17,17 +17,17 @@ function hashPassword(password, pepper) {
       p: SCRYPT_PARAMS.p
     }, (err, derivedKey) => {
       if (err) return reject(err);
-      resolve(`${salt}:${derivedKey.toString('hex')}`);
+      resolve({ salt, hash: derivedKey.toString('hex') });
     });
   });
 }
 
 /**
  * Vérifie un mot de passe contre un hash stocké, avec timing-safe compare.
+ * Le salt est fourni séparément (colonne dédiée en DB).
  */
-function verifyPassword(password, storedHash, pepper) {
+function verifyPassword(password, storedHash, salt, pepper) {
   return new Promise((resolve, reject) => {
-    const [salt, hash] = storedHash.split(':');
     const input = `${password}${pepper}`;
 
     crypto.scrypt(input, salt, SCRYPT_PARAMS.keyLength, {
@@ -36,7 +36,7 @@ function verifyPassword(password, storedHash, pepper) {
       p: SCRYPT_PARAMS.p
     }, (err, derivedKey) => {
       if (err) return reject(err);
-      const hashBuffer = Buffer.from(hash, 'hex');
+      const hashBuffer = Buffer.from(storedHash, 'hex');
       resolve(crypto.timingSafeEqual(hashBuffer, derivedKey));
     });
   });
@@ -52,4 +52,12 @@ function safeCompare(a, b) {
   return crypto.timingSafeEqual(hashA, hashB);
 }
 
-module.exports = { hashPassword, verifyPassword, safeCompare };
+/**
+ * Crée un fingerprint à partir du User-Agent (CDC 4.2 : hash user-agent).
+ */
+function createFingerprint(userAgent) {
+  if (!userAgent) return null;
+  return crypto.createHash('sha256').update(userAgent).digest('hex');
+}
+
+module.exports = { hashPassword, verifyPassword, safeCompare, createFingerprint };

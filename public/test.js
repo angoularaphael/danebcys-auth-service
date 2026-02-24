@@ -102,11 +102,13 @@ $('#btn-signup').addEventListener('click', async () => {
     const pow = await solvePoW($('#signup-pow-status'));
 
     const data = await apiCall('POST', `${API}/signup`, {
+      username: $('#signup-username').value,
       email: $('#signup-email').value,
       password: $('#signup-password').value,
-      firstName: $('#signup-firstname').value,
-      lastName: $('#signup-lastname').value,
-      phone: $('#signup-phone').value || undefined
+      firstName: $('#signup-firstname').value || undefined,
+      lastName: $('#signup-lastname').value || undefined,
+      phone: $('#signup-phone').value || undefined,
+      country: $('#signup-country').value || undefined
     }, {
       'x-pow-challenge': pow.challenge,
       'x-pow-nonce': pow.nonce,
@@ -116,7 +118,7 @@ $('#btn-signup').addEventListener('click', async () => {
     accessToken = data.accessToken;
     refreshToken = data.refreshToken;
     updateTokenDisplay();
-    log(`Inscrit : ${data.user.email} (${data.user.id})`, 'ok');
+    log(`Inscrit : ${data.user.username} (${data.user.email})`, 'ok');
   } catch (e) {
     /* already logged */
   }
@@ -142,7 +144,7 @@ $('#btn-login').addEventListener('click', async () => {
     accessToken = data.accessToken;
     refreshToken = data.refreshToken;
     updateTokenDisplay();
-    log(`Connecté : ${data.user.email}`, 'ok');
+    log(`Connecté : ${data.user.username} (${data.user.role})`, 'ok');
   } catch (e) {
     /* already logged */
   }

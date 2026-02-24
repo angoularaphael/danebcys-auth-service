@@ -18,7 +18,7 @@ function getTransporter() {
 
 async function sendVerificationEmail(to, code) {
   const mailOptions = {
-    from: `"Plateforme" <${env.EMAIL_USER}>`,
+    from: `"DANEBCYS" <${env.EMAIL_USER}>`,
     to,
     subject: 'Vérification de votre adresse email',
     html: `
@@ -40,7 +40,7 @@ async function sendVerificationEmail(to, code) {
 
 async function sendPasswordResetEmail(to, code) {
   const mailOptions = {
-    from: `"Plateforme" <${env.EMAIL_USER}>`,
+    from: `"DANEBCYS" <${env.EMAIL_USER}>`,
     to,
     subject: 'Réinitialisation de votre mot de passe',
     html: `
@@ -60,4 +60,24 @@ async function sendPasswordResetEmail(to, code) {
   return getTransporter().sendMail(mailOptions);
 }
 
-module.exports = { sendVerificationEmail, sendPasswordResetEmail };
+/**
+ * Stub SMS : en développement le code est loggé en console.
+ * En production, remplacer par Twilio (CDC 2.4 / 6.1).
+ */
+async function sendPhoneVerificationSms(phone, code) {
+  if (env.NODE_ENV === 'development') {
+    console.log(`[SMS STUB] Code de vérification pour ${phone} : ${code}`);
+    return;
+  }
+
+  // TODO: Intégrer Twilio en production
+  // const twilio = require('twilio')(env.TWILIO_SID, env.TWILIO_AUTH_TOKEN);
+  // await twilio.messages.create({
+  //   body: `Votre code de vérification : ${code}`,
+  //   from: env.TWILIO_PHONE,
+  //   to: phone
+  // });
+  console.warn('[SMS] Twilio non configuré, code non envoyé:', code);
+}
+
+module.exports = { sendVerificationEmail, sendPasswordResetEmail, sendPhoneVerificationSms };

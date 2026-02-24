@@ -2,18 +2,28 @@ const authService = require('../services/auth.service');
 const { createChallenge } = require('../middlewares/pow');
 const { BadRequestError } = require('../utils/errors');
 
+function extractContext(req) {
+  return {
+    userAgent: req.headers['user-agent'] || '',
+    clientIp: req.clientIp || req.ip
+  };
+}
+
 async function signup(req, res, next) {
   try {
-    const { email, password, firstName, lastName, phone } = req.body;
+    const { email, password, username, firstName, lastName, phone, country } = req.body;
 
-    if (!email || !password || !firstName || !lastName) {
-      throw new BadRequestError('email, password, firstName et lastName sont requis');
+    if (!email || !password || !username) {
+      throw new BadRequestError('email, password et username sont requis');
     }
     if (password.length < 8) {
       throw new BadRequestError('Le mot de passe doit contenir au moins 8 caractères');
     }
 
-    const result = await authService.signup({ email, password, firstName, lastName, phone });
+    const result = await authService.signup(
+      { email, password, username, firstName, lastName, phone, country },
+      extractContext(req)
+    );
     res.status(201).json(result);
   } catch (err) {
     next(err);
@@ -28,7 +38,10 @@ async function login(req, res, next) {
       throw new BadRequestError('email et password sont requis');
     }
 
-    const result = await authService.login({ email, password });
+    const result = await authService.login(
+      { email, password },
+      extractContext(req)
+    );
     res.json(result);
   } catch (err) {
     next(err);
@@ -43,7 +56,7 @@ async function refresh(req, res, next) {
       throw new BadRequestError('refreshToken est requis');
     }
 
-    const result = await authService.refresh(refreshToken);
+    const result = await authService.refresh(refreshToken, extractContext(req));
     res.json(result);
   } catch (err) {
     next(err);

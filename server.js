@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 const app = require('./src/app');
-const { pool } = require('./src/config/database');
+const { pool, initDB } = require('./src/config/database');
 const { initPepper } = require('./src/services/pepper.service');
 const env = require('./src/config/env');
 
@@ -11,6 +11,8 @@ async function start() {
     await client.query('SELECT 1');
     client.release();
     console.log('[Auth Service] PostgreSQL connecté');
+
+    await initDB();
 
     await initPepper();
 
