@@ -94,6 +94,20 @@ CREATE INDEX IF NOT EXISTS idx_email_verifications_code ON email_verifications(c
 CREATE INDEX IF NOT EXISTS idx_password_resets_user_id ON password_resets(user_id);
 CREATE INDEX IF NOT EXISTS idx_password_resets_code ON password_resets(code);
 
+-- Table des vérifications téléphone (CDC 6.1)
+CREATE TABLE IF NOT EXISTS phone_verifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  phone VARCHAR(20) NOT NULL,
+  code VARCHAR(6) NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_phone_verifications_user_id ON phone_verifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_phone_verifications_code ON phone_verifications(code);
+
 -- Trigger CDC : update_updated_at (BEFORE UPDATE → set updated_at = NOW())
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$

@@ -143,4 +143,25 @@ async function resetPassword(req, res, next) {
   }
 }
 
-module.exports = { signup, login, refresh, logout, getMe, verifyEmail, getChallenge, forgotPassword, resetPassword };
+async function sendPhoneCode(req, res, next) {
+  try {
+    await authService.requestPhoneVerification(req.user.id);
+    res.json({ message: 'Code de vérification envoyé par SMS' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function verifyPhone(req, res, next) {
+  try {
+    const { code } = req.body;
+    if (!code) throw new BadRequestError('code est requis');
+
+    await authService.verifyPhone(req.user.id, code);
+    res.json({ message: 'Téléphone vérifié avec succès' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { signup, login, refresh, logout, getMe, verifyEmail, verifyPhone, sendPhoneCode, getChallenge, forgotPassword, resetPassword };

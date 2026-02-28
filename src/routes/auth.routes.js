@@ -18,5 +18,7 @@ router.post('/refresh', preAuthTokenLimiter, controller.refresh);
 router.post('/logout', authenticate, tokenLimiter, controller.logout);
 router.get('/me', authenticate, tokenLimiter, controller.getMe);
 router.post('/verify-email', authenticate, tokenLimiter, controller.verifyEmail);
+router.post('/send-phone-code', authenticate, tokenLimiter, controller.sendPhoneCode);
+router.post('/verify-phone', authenticate, tokenLimiter, controller.verifyPhone);
 
 module.exports = router;

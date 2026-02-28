@@ -234,4 +234,41 @@ async function resetPassword(email, code, newPassword) {
   await tokenService.revokeAllUserTokens(user_id);
 }
 
-module.exports = { signup, login, refresh, logout, getMe, verifyEmail, forgotPassword, resetPassword };
+async function requestPhoneVerification(userId) {
+  const userResult = await query(
+    'SELECT phone FROM users WHERE id = $1 AND deleted = FALSE',
+    [userId]
+  );
+  if (userResult.rows.length === 0) throw new BadRequestError('Utilisateur introuvable');
+  const { phone } = userResult.rows[0];
+  if (!phone) throw new BadRequestError('Aucun numéro de téléphone associé au compte');
+
+  const code = generateCode();
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+  await query(
+    'INSERT INTO phone_verifications (user_id, phone, code, expires_at) VALUES ($1, $2, $3, $4)',
+    [userId, phone, code, expiresAt]
+  );
+
+  mailService.sendPhoneVerificationSms(phone, code).catch((err) => {
+    console.error('[auth] Erreur envoi SMS de vérification:', err.message);
+  });
+}
+
+async function verifyPhone(userId, code) {
+  const result = await query(
+    `SELECT * FROM phone_verifications
+     WHERE user_id = $1 AND code = $2 AND used = FALSE AND expires_at > NOW()
+     ORDER BY created_at DESC LIMIT 1`,
+    [userId, code]
+  );
+
+  if (result.rows.length === 0) {
+    throw new BadRequestError('Code invalide ou expiré');
+  }
+
+  await query('UPDATE phone_verifications SET used = TRUE WHERE id = $1', [result.rows[0].id]);
+  await query('UPDATE users SET phone_verified = TRUE WHERE id = $1', [userId]);
+}
+
+module.exports = { signup, login, refresh, logout, getMe, verifyEmail, verifyPhone, requestPhoneVerification, forgotPassword, resetPassword };

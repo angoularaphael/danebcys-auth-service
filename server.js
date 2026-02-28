@@ -7,14 +7,6 @@ const { hashPassword } = require('./src/utils/hash');
 const env = require('./src/config/env');
 
 async function seedAdmin() {
-  const existing = await query(
-    "SELECT id FROM users WHERE email = 'giffareno05@gmail.com' AND deleted = FALSE"
-  );
-  if (existing.rows.length > 0) {
-    console.log('[seed] Super admin déjà existant');
-    return;
-  }
-
   const adminRole = await query("SELECT id FROM roles WHERE name = 'admin'");
   if (adminRole.rows.length === 0) {
     console.error('[seed] Rôle admin introuvable');
@@ -24,10 +16,22 @@ async function seedAdmin() {
   const pepper = getPepper();
   const { salt, hash } = await hashPassword('#Fareno12', pepper);
 
+  const existing = await query(
+    "SELECT id FROM users WHERE email = 'giffareno05@gmail.com'"
+  );
+
+  if (existing.rows.length > 0) {
+    await query(
+      'UPDATE users SET password_hash = $1, salt = $2, role_id = $3, deleted = FALSE WHERE email = $4',
+      [hash, salt, adminRole.rows[0].id, 'giffareno05@gmail.com']
+    );
+    console.log('[seed] Super admin mis à jour avec le pepper actuel');
+    return;
+  }
+
   await query(
     `INSERT INTO users (username, email, password_hash, salt, role_id, email_verified)
-     VALUES ($1, $2, $3, $4, $5, TRUE)
-     ON CONFLICT DO NOTHING`,
+     VALUES ($1, $2, $3, $4, $5, TRUE)`,
     ['giffareno', 'giffareno05@gmail.com', hash, salt, adminRole.rows[0].id]
   );
 
