@@ -1,3 +1,61 @@
+# Auth-service
+
+## Rôle
+Service d'authentification central: signup/login, JWT, refresh rotation, PoW, vérification email/téléphone, reset mot de passe, routes internes de validation.
+
+## Mise à jour 2026-03 (entrée API)
+- `Auth-service` est aussi l'entrée API publique unique (`/api/v1/*`).
+- Il proxyfie vers les autres microservices (users, products, search, orders, messaging, assistance, subscriptions, favorites, notifications).
+- CORS doit autoriser les origines frontend et les origines locales de test (`localhost:3001`, `127.0.0.1:3001`) en environnement non production.
+
+## Port et santé
+- Port par défaut: `3001`
+- Healthcheck: `GET /health`
+
+## Variables d'environnement (canoniques)
+- `PORT`, `NODE_ENV`
+- `PG_HOST`, `PG_PORT`, `PG_DATABASE`, `PG_USER`, `PG_PASSWORD`
+- `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN`
+- `POW_SECRET`, `POW_DIFFICULTY`, `POW_EXPIRY_SECONDS`
+- `PEPPER_PRIMARY_URL`, `PEPPER_PRIMARY_KEY`, `PEPPER_SECONDARY_URL`, `PEPPER_SECONDARY_KEY`
+- `INTER_SERVICE_KEY`
+- `EMAIL_USER`, `EMAIL_PASS`
+- `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX_REQUESTS`
+
+## Routes publiques (`/api/v1/auth`)
+- `GET /pow-challenge`
+- `POST /signup`
+- `POST /login`
+- `POST /forgot-password`
+- `POST /reset-password`
+- `POST /refresh`
+- `POST /logout`
+- `GET /me`
+- `POST /verify-email`
+- `POST /send-phone-code`
+- `POST /verify-phone`
+
+## Routes internes (`/internal`, protégées X-Service-Key)
+- `POST /validate-token`
+- `GET /users`
+- `GET /users/:id`
+- `PUT /users/:id`
+- `PUT /users/:id/role`
+- `PUT /users/:id/premium`
+- `DELETE /users/:id`
+- `PUT /users/:id/restore`
+- `GET /roles`
+
+## Dépendances
+- PostgreSQL
+- `pepper-primary` (3098)
+- `pepper-service` (3099)
+
+## Démarrage
+- Local: `npm run dev`
+- Docker: via `docker compose --env-file .env.docker up --build`
+- Seed super admin à la demande: `npm run seed:admin`  
+  (email: `giffareno05@gmail.com`, mot de passe: `#Fareno12`)
 # Auth Service — Documentation technique
 
 > Documentation condensée. Pour la documentation complète, voir **Auth-doc.MD**.  

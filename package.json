@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "db:init": "node -e \"require('dotenv').config();require('./src/config/database').initDB().then(() => process.exit(0)).catch((e) => {console.error(e);process.exit(1)})\""
+    "db:init": "node -e \"require('dotenv').config();require('./src/config/database').initDB().then(() => process.exit(0)).catch((e) => {console.error(e);process.exit(1)})\"",
+    "seed:admin": "node scripts/seed-super-admin.js"
   },
   "restrictions": {
     "forbidden": [

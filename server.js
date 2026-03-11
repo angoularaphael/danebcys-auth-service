@@ -1,42 +1,10 @@
 require('dotenv').config();
 
 const app = require('./src/app');
-const { pool, initDB, query } = require('./src/config/database');
+const { pool, initDB } = require('./src/config/database');
 const { initPepper, getPepper } = require('./src/services/pepper.service');
-const { hashPassword } = require('./src/utils/hash');
+const { seedSuperAdmin, seedVendeurAndAssistance } = require('./src/services/adminSeed.service');
 const env = require('./src/config/env');
-
-async function seedAdmin() {
-  const adminRole = await query("SELECT id FROM roles WHERE name = 'admin'");
-  if (adminRole.rows.length === 0) {
-    console.error('[seed] Rôle admin introuvable');
-    return;
-  }
-
-  const pepper = getPepper();
-  const { salt, hash } = await hashPassword('#Fareno12', pepper);
-
-  const existing = await query(
-    "SELECT id FROM users WHERE email = 'giffareno05@gmail.com'"
-  );
-
-  if (existing.rows.length > 0) {
-    await query(
-      'UPDATE users SET password_hash = $1, salt = $2, role_id = $3, deleted = FALSE WHERE email = $4',
-      [hash, salt, adminRole.rows[0].id, 'giffareno05@gmail.com']
-    );
-    console.log('[seed] Super admin mis à jour avec le pepper actuel');
-    return;
-  }
-
-  await query(
-    `INSERT INTO users (username, email, password_hash, salt, role_id, email_verified)
-     VALUES ($1, $2, $3, $4, $5, TRUE)`,
-    ['giffareno', 'giffareno05@gmail.com', hash, salt, adminRole.rows[0].id]
-  );
-
-  console.log('[seed] Super admin créé : giffareno (giffareno05@gmail.com)');
-}
 
 async function start() {
   try {
@@ -49,7 +17,17 @@ async function start() {
 
     await initPepper();
 
-    await seedAdmin();
+    const seeded = await seedSuperAdmin(getPepper());
+    console.log(
+      seeded.created
+        ? `[seed] Super admin créé: ${seeded.email}`
+        : `[seed] Super admin mis à jour: ${seeded.email}`
+    );
+
+    const vendeurAssistance = await seedVendeurAndAssistance(getPepper());
+    for (const r of vendeurAssistance) {
+      console.log(`[seed] ${r.role} ${r.created ? 'créé' : 'mis à jour'}: ${r.email} (mdp: 12345678)`);
+    }
 
     app.listen(env.PORT, () => {
       console.log(`[Auth Service] Démarré sur le port ${env.PORT}`);

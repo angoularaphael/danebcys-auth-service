@@ -1,7 +1,6 @@
 const { Router } = require('express');
 const { serviceAuth } = require('../middlewares/serviceAuth');
-const jwt = require('../utils/jwt');
-const env = require('../config/env');
+const tokenService = require('../services/token.service');
 const { query } = require('../config/database');
 
 const router = Router();
@@ -16,21 +15,8 @@ router.post('/validate-token', async (req, res) => {
       return res.status(400).json({ valid: false, error: 'accessToken requis' });
     }
 
-    const payload = jwt.verify(accessToken, env.JWT_ACCESS_SECRET);
-
-    const result = await query(
-      `SELECT u.id, u.email, u.username, u.role_id, r.name AS role
-       FROM users u
-       JOIN roles r ON u.role_id = r.id
-       WHERE u.id = $1 AND u.deleted = FALSE`,
-      [payload.sub]
-    );
-
-    if (result.rows.length === 0) {
-      return res.json({ valid: false, error: 'Utilisateur non trouvé' });
-    }
-
-    res.json({ valid: true, user: result.rows[0] });
+    const validated = await tokenService.validateAccessToken(accessToken);
+    res.json({ valid: true, user: validated.user });
   } catch (err) {
     res.json({ valid: false, error: err.message });
   }

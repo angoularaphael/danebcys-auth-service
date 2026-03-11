@@ -11,6 +11,14 @@ for (const key of requiredVars) {
   }
 }
 
+function parseList(value, fallback = '') {
+  const source = value || fallback;
+  return source
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 module.exports = {
   PORT: parseInt(process.env.PORT, 10) || 3001,
   NODE_ENV: process.env.NODE_ENV || 'development',
@@ -33,6 +41,7 @@ module.exports = {
 
   EMAIL_USER: process.env.EMAIL_USER,
   EMAIL_PASS: process.env.EMAIL_PASS,
+  IP_LOG_SECRET: process.env.IP_LOG_SECRET || '',
 
   POW_DIFFICULTY: parseInt(process.env.POW_DIFFICULTY, 10) || 4,
   POW_SECRET: process.env.POW_SECRET,
@@ -40,6 +49,25 @@ module.exports = {
 
   INTER_SERVICE_KEY: process.env.INTER_SERVICE_KEY,
 
+  USERS_SERVICE_URL: process.env.USERS_SERVICE_URL || 'http://localhost:3002',
+  SEARCH_SERVICE_URL: process.env.SEARCH_SERVICE_URL || 'http://localhost:3003',
+  PRODUCTS_SERVICE_URL: process.env.PRODUCTS_SERVICE_URL || 'http://localhost:3004',
+  ORDERS_SERVICE_URL: process.env.ORDERS_SERVICE_URL || 'http://localhost:3005',
+  MESSAGING_SERVICE_URL: process.env.MESSAGING_SERVICE_URL || 'http://localhost:3006',
+  ASSISTANCE_SERVICE_URL: process.env.ASSISTANCE_SERVICE_URL || 'http://localhost:3007',
+  SUBSCRIPTIONS_SERVICE_URL: process.env.SUBSCRIPTIONS_SERVICE_URL || 'http://localhost:3008',
+  FAVORITES_SERVICE_URL: process.env.FAVORITES_SERVICE_URL || 'http://localhost:3009',
+  NOTIFICATIONS_SERVICE_URL: process.env.NOTIFICATIONS_SERVICE_URL || 'http://localhost:3010',
+
+  CORS_ORIGINS: parseList(
+    process.env.CORS_ORIGINS,
+    'http://localhost:4200,http://127.0.0.1:4200,http://localhost:3001,http://127.0.0.1:3001'
+  ),
+  JSON_LIMIT: process.env.JSON_LIMIT || '1mb',
+  PROXY_TIMEOUT_MS: parseInt(process.env.PROXY_TIMEOUT_MS, 10) || 8000,
+
   RATE_LIMIT_WINDOW_MS: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 900000,
-  RATE_LIMIT_MAX_REQUESTS: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100
+  RATE_LIMIT_MAX_REQUESTS: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100,
+  AUTH_RATE_LIMIT_WINDOW_MS: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS, 10) || 300000,
+  AUTH_RATE_LIMIT_MAX_REQUESTS: parseInt(process.env.AUTH_RATE_LIMIT_MAX_REQUESTS, 10) || 40
 };

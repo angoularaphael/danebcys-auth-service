@@ -46,6 +46,9 @@ CREATE TABLE IF NOT EXISTS users (
   last_login_at TIMESTAMPTZ
 );
 
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0;
+
 -- Table des sessions / tokens (CDC 5.1 – Sessions)
 CREATE TABLE IF NOT EXISTS sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -57,6 +60,16 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Table de revocation persistante des access tokens
+CREATE TABLE IF NOT EXISTS token_blacklist (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  token_jti VARCHAR(128) NOT NULL UNIQUE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reason VARCHAR(100),
+  expires_at TIMESTAMPTZ NOT NULL,
+  revoked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Table des vérifications email
@@ -85,9 +98,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_active ON users(username) W
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_active ON users(phone) WHERE deleted = FALSE AND phone IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_deleted ON users(deleted);
 CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id);
+CREATE INDEX IF NOT EXISTS idx_users_token_version ON users(token_version);
 
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
+CREATE INDEX IF NOT EXISTS idx_token_blacklist_user_id ON token_blacklist(user_id);
+CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires_at ON token_blacklist(expires_at);
 
 CREATE INDEX IF NOT EXISTS idx_email_verifications_user_id ON email_verifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_email_verifications_code ON email_verifications(code);

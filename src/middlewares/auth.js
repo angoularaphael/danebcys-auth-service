@@ -1,7 +1,7 @@
 const tokenService = require('../services/token.service');
 const { UnauthorizedError } = require('../utils/errors');
 
-function authenticate(req, _res, next) {
+async function authenticate(req, _res, next) {
   try {
     const header = req.headers.authorization;
     if (!header || !header.startsWith('Bearer ')) {
@@ -9,8 +9,9 @@ function authenticate(req, _res, next) {
     }
 
     const token = header.split(' ')[1];
-    const payload = tokenService.verifyAccessToken(token);
-    req.user = { id: payload.sub, email: payload.email, role: payload.role };
+    const validated = await tokenService.validateAccessToken(token);
+    req.accessToken = token;
+    req.user = validated.user;
     next();
   } catch (_err) {
     next(new UnauthorizedError('Token invalide ou expiré'));

@@ -17,7 +17,10 @@ router.post('/refresh', preAuthTokenLimiter, controller.refresh);
 
 router.post('/logout', authenticate, tokenLimiter, controller.logout);
 router.get('/me', authenticate, tokenLimiter, controller.getMe);
+router.put('/me/password', authenticate, tokenLimiter, controller.changePassword);
+router.post('/me/revoke-sessions', authenticate, tokenLimiter, controller.revokeOtherSessions);
 router.post('/verify-email', authenticate, tokenLimiter, controller.verifyEmail);
+router.post('/resend-email-code', authenticate, tokenLimiter, controller.resendEmailCode);
 router.post('/send-phone-code', authenticate, tokenLimiter, controller.sendPhoneCode);
 router.post('/verify-phone', authenticate, tokenLimiter, controller.verifyPhone);
 

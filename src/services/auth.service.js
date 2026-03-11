@@ -34,7 +34,7 @@ async function signup({ email, password, username, firstName, lastName, phone, c
     `INSERT INTO users (username, email, phone, password_hash, salt, first_name, last_name, country)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING id, username, email, phone, first_name, last_name,
-               email_verified, phone_verified, role_id, premium_level,
+               email_verified, phone_verified, role_id, token_version, premium_level,
                country, created_at`,
     [username, email, phone || null, hash, salt, firstName || null, lastName || null, country || null]
   );
@@ -54,7 +54,12 @@ async function signup({ email, password, username, firstName, lastName, phone, c
   });
 
   const fingerprintHash = createFingerprint(userAgent);
-  const accessToken = tokenService.generateAccessToken({ id: user.id, email: user.email, role: 'user' });
+  const accessToken = tokenService.generateAccessToken({
+    id: user.id,
+    email: user.email,
+    role: 'user',
+    tokenVersion: user.token_version
+  });
   const refreshToken = tokenService.generateRefreshToken();
   await tokenService.storeRefreshToken(user.id, refreshToken, {
     fingerprintHash,
@@ -85,13 +90,30 @@ async function login({ email, password }, { userAgent, clientIp } = {}) {
     throw new UnauthorizedError('Email ou mot de passe incorrect');
   }
 
+  if (!user.email_verified) {
+    const code = generateCode();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    await query(
+      'INSERT INTO email_verifications (user_id, code, expires_at) VALUES ($1, $2, $3)',
+      [user.id, code, expiresAt]
+    );
+    mailService.sendVerificationEmail(user.email, code).catch((err) => {
+      console.error('[auth] Erreur envoi email de vérification:', err.message);
+    });
+  }
+
   await query(
     'UPDATE users SET last_login_at = NOW() WHERE id = $1',
     [user.id]
   );
 
   const fingerprintHash = createFingerprint(userAgent);
-  const accessToken = tokenService.generateAccessToken({ id: user.id, email: user.email, role: user.role_name });
+  const accessToken = tokenService.generateAccessToken({
+    id: user.id,
+    email: user.email,
+    role: user.role_name,
+    tokenVersion: user.token_version
+  });
   const refreshToken = tokenService.generateRefreshToken();
   await tokenService.storeRefreshToken(user.id, refreshToken, {
     fingerprintHash,
@@ -129,8 +151,11 @@ async function refresh(oldRefreshToken, { userAgent, clientIp } = {}) {
   return { accessToken, refreshToken: newRefreshToken };
 }
 
-async function logout(refreshToken) {
+async function logout(refreshToken, accessToken) {
   await tokenService.revokeRefreshToken(refreshToken);
+  if (accessToken) {
+    await tokenService.revokeAccessToken(accessToken, 'logout');
+  }
 }
 
 async function getMe(userId) {
@@ -163,6 +188,60 @@ async function verifyEmail(userId, code) {
 
   await query('UPDATE email_verifications SET used = TRUE WHERE id = $1', [result.rows[0].id]);
   await query('UPDATE users SET email_verified = TRUE WHERE id = $1', [userId]);
+}
+
+async function changePassword(userId, currentPassword, newPassword) {
+  const result = await query(
+    'SELECT id, password_hash, salt FROM users WHERE id = $1 AND deleted = FALSE',
+    [userId]
+  );
+  if (result.rows.length === 0) {
+    throw new BadRequestError('Utilisateur introuvable');
+  }
+  const user = result.rows[0];
+  const pepper = getPepper();
+  const valid = await verifyPassword(currentPassword, user.password_hash, user.salt, pepper);
+  if (!valid) {
+    throw new UnauthorizedError('Mot de passe actuel incorrect');
+  }
+  if (newPassword.length < 8) {
+    throw new BadRequestError('Le nouveau mot de passe doit contenir au moins 8 caractères');
+  }
+  const { salt, hash } = await hashPassword(newPassword, pepper);
+  await query('UPDATE users SET password_hash = $1, salt = $2 WHERE id = $3', [hash, salt, userId]);
+}
+
+async function revokeOtherSessions(userId, keepRefreshToken) {
+  await tokenService.revokeOtherUserSessions(userId, keepRefreshToken);
+}
+
+async function resendEmailVerificationCode(userId) {
+  const userResult = await query(
+    'SELECT id, email, email_verified FROM users WHERE id = $1 AND deleted = FALSE',
+    [userId]
+  );
+
+  if (userResult.rows.length === 0) {
+    throw new BadRequestError('Utilisateur introuvable');
+  }
+
+  const user = userResult.rows[0];
+  if (user.email_verified) {
+    return { message: 'Adresse email deja verifiee' };
+  }
+
+  const code = generateCode();
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+  await query(
+    'INSERT INTO email_verifications (user_id, code, expires_at) VALUES ($1, $2, $3)',
+    [user.id, code, expiresAt]
+  );
+
+  mailService.sendVerificationEmail(user.email, code).catch((err) => {
+    console.error('[auth] Erreur envoi email de verification:', err.message);
+  });
+
+  return { message: 'Code de verification renvoye' };
 }
 
 function formatUser(row) {
@@ -232,6 +311,7 @@ async function resetPassword(email, code, newPassword) {
   );
 
   await tokenService.revokeAllUserTokens(user_id);
+  await tokenService.bumpUserTokenVersion(user_id);
 }
 
 async function requestPhoneVerification(userId) {
@@ -271,4 +351,18 @@ async function verifyPhone(userId, code) {
   await query('UPDATE users SET phone_verified = TRUE WHERE id = $1', [userId]);
 }
 
-module.exports = { signup, login, refresh, logout, getMe, verifyEmail, verifyPhone, requestPhoneVerification, forgotPassword, resetPassword };
+module.exports = {
+  signup,
+  login,
+  refresh,
+  logout,
+  getMe,
+  verifyEmail,
+  resendEmailVerificationCode,
+  verifyPhone,
+  requestPhoneVerification,
+  forgotPassword,
+  resetPassword,
+  changePassword,
+  revokeOtherSessions
+};

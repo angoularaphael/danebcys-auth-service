@@ -71,7 +71,7 @@ async function logout(req, res, next) {
       throw new BadRequestError('refreshToken est requis');
     }
 
-    await authService.logout(refreshToken);
+    await authService.logout(refreshToken, req.accessToken);
     res.json({ message: 'Déconnexion réussie' });
   } catch (err) {
     next(err);
@@ -100,6 +100,15 @@ async function verifyEmail(req, res, next) {
 
     await authService.verifyEmail(req.user.id, code);
     res.json({ message: 'Email vérifié avec succès' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function resendEmailCode(req, res, next) {
+  try {
+    const result = await authService.resendEmailVerificationCode(req.user.id);
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -164,4 +173,49 @@ async function verifyPhone(req, res, next) {
   }
 }
 
-module.exports = { signup, login, refresh, logout, getMe, verifyEmail, verifyPhone, sendPhoneCode, getChallenge, forgotPassword, resetPassword };
+async function changePassword(req, res, next) {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      throw new BadRequestError('currentPassword et newPassword sont requis');
+    }
+
+    await authService.changePassword(req.user.id, currentPassword, newPassword);
+    res.json({ message: 'Mot de passe modifié avec succès' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function revokeOtherSessions(req, res, next) {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      throw new BadRequestError('refreshToken est requis');
+    }
+
+    await authService.revokeOtherSessions(req.user.id, refreshToken);
+    res.json({ message: 'Toutes les autres sessions ont été fermées' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  signup,
+  login,
+  refresh,
+  logout,
+  getMe,
+  verifyEmail,
+  resendEmailCode,
+  verifyPhone,
+  sendPhoneCode,
+  getChallenge,
+  forgotPassword,
+  resetPassword,
+  changePassword,
+  revokeOtherSessions
+};
