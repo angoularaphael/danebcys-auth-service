@@ -49,6 +49,8 @@ module.exports = {
 
   INTER_SERVICE_KEY: process.env.INTER_SERVICE_KEY,
 
+  ASSISTANCE_EMAIL: process.env.ASSISTANCE_EMAIL || 'angoularaphael05@gmail.com',
+
   USERS_SERVICE_URL: process.env.USERS_SERVICE_URL || 'http://localhost:3002',
   SEARCH_SERVICE_URL: process.env.SEARCH_SERVICE_URL || 'http://localhost:3003',
   PRODUCTS_SERVICE_URL: process.env.PRODUCTS_SERVICE_URL || 'http://localhost:3004',
@@ -68,6 +70,9 @@ module.exports = {
 
   RATE_LIMIT_WINDOW_MS: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 900000,
   RATE_LIMIT_MAX_REQUESTS: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100,
+
+  FRAUD_REQUESTS_PER_MIN: parseInt(process.env.FRAUD_REQUESTS_PER_MIN, 10) || 20,
+  FRAUD_BAN_AFTER_NOTIF: parseInt(process.env.FRAUD_BAN_AFTER_NOTIF, 10) || 5,
   AUTH_RATE_LIMIT_WINDOW_MS: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS, 10) || 300000,
   AUTH_RATE_LIMIT_MAX_REQUESTS: parseInt(process.env.AUTH_RATE_LIMIT_MAX_REQUESTS, 10) || 40
 };

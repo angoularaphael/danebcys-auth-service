@@ -158,9 +158,10 @@ router.put('/users/:id/role', async (req, res) => {
     if (!roleId) return res.status(400).json({ error: 'roleId requis' });
 
     const result = await query(
-      `UPDATE users SET role_id = $1
-       WHERE id = $2 AND deleted = FALSE
-       RETURNING id, username, email, role_id`,
+      `UPDATE users u SET role_id = $1
+       FROM roles r
+       WHERE u.id = $2 AND u.deleted = FALSE AND r.id = $1
+       RETURNING u.id, u.username, u.email, u.role_id, r.name AS role`,
       [roleId, req.params.id]
     );
 
@@ -236,7 +237,10 @@ router.delete('/users/:id', async (req, res) => {
 router.put('/users/:id/restore', async (req, res) => {
   try {
     const result = await query(
-      `UPDATE users SET deleted = FALSE WHERE id = $1 AND deleted = TRUE RETURNING id, username, email`,
+      `UPDATE users u SET deleted = FALSE
+       FROM roles r
+       WHERE u.id = $1 AND u.deleted = TRUE AND u.role_id = r.id
+       RETURNING u.id, u.username, u.email, u.role_id, r.name AS role`,
       [req.params.id]
     );
 

@@ -2,6 +2,7 @@ const { Router } = require('express');
 const env = require('../config/env');
 const authRoutes = require('./auth.routes');
 const { authenticateRequired, authenticateOptional } = require('../middlewares/proxyAuth');
+const { fraudDetector } = require('../middlewares/fraudDetector');
 const { proxyTo } = require('../services/proxy');
 
 function withApiPath(baseUrl, apiPath) {
@@ -34,7 +35,8 @@ function withResolvedAuth(resolveMode, handler) {
 
 function createProxyRouter(targetBaseUrl, resolveMode = () => 'none') {
   const router = Router();
-  const handler = proxyTo(targetBaseUrl);
+  const proxyHandler = proxyTo(targetBaseUrl);
+  const handler = (req, res, next) => fraudDetector(req, res, () => proxyHandler(req, res, next));
   router.use(withResolvedAuth(resolveMode, handler));
   return router;
 }

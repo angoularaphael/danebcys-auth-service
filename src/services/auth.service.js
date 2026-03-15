@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { query } = require('../config/database');
+const env = require('../config/env');
 const { hashPassword, verifyPassword, createFingerprint } = require('../utils/hash');
 const { getPepper } = require('./pepper.service');
 const tokenService = require('./token.service');
@@ -74,7 +75,7 @@ async function login({ email, password }, { userAgent, clientIp } = {}) {
     `SELECT u.*, r.name AS role_name
      FROM users u
      JOIN roles r ON u.role_id = r.id
-     WHERE u.email = $1 AND u.deleted = FALSE`,
+     WHERE u.email = $1`,
     [email]
   );
 
@@ -83,6 +84,13 @@ async function login({ email, password }, { userAgent, clientIp } = {}) {
   }
 
   const user = result.rows[0];
+
+  if (user.deleted) {
+    const assistanceEmail = env.ASSISTANCE_EMAIL || 'angoularaphael05@gmail.com';
+    throw new UnauthorizedError(
+      `Votre compte a été banni. Pour contester cette décision, contactez l'assistance par email à ${assistanceEmail}`
+    );
+  }
   const pepper = getPepper();
   const valid = await verifyPassword(password, user.password_hash, user.salt, pepper);
 

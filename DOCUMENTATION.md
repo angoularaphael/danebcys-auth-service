@@ -186,6 +186,7 @@ Auth-service/
 ## 7. Vérification email & téléphone
 
 - **Email** : code 6 chiffres envoyé via Nodemailer/Gmail, expire 15 min
+- **Configuration Gmail** : `EMAIL_USER` = adresse Gmail, `EMAIL_PASS` = **mot de passe d'application** (pas le mot de passe du compte). Créer un mot de passe d'application : https://myaccount.google.com/apppasswords
 - **Téléphone** : code 6 chiffres, stub en dev (console.log), Twilio en production
 - Routes : `POST /verify-email`, `POST /send-phone-code`, `POST /verify-phone`
 

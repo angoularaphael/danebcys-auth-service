@@ -2,9 +2,14 @@ const nodemailer = require('nodemailer');
 const env = require('../config/env');
 
 let transporter = null;
+let verified = false;
 
 function getTransporter() {
   if (!transporter) {
+    if (!env.EMAIL_USER || !env.EMAIL_PASS) {
+      console.error('[mail] EMAIL_USER et EMAIL_PASS doivent être définis. Pour Gmail, utilisez un mot de passe d\'application (https://myaccount.google.com/apppasswords).');
+      throw new Error('Configuration email manquante (EMAIL_USER, EMAIL_PASS)');
+    }
     transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -14,6 +19,25 @@ function getTransporter() {
     });
   }
   return transporter;
+}
+
+/**
+ * Vérifie la connexion SMTP au démarrage ou à la première utilisation.
+ * Log une erreur claire si la configuration est incorrecte.
+ */
+async function verifyTransporter() {
+  if (verified) return true;
+  try {
+    const t = getTransporter();
+    await t.verify();
+    verified = true;
+    console.log('[mail] Connexion SMTP vérifiée avec succès');
+    return true;
+  } catch (err) {
+    console.error('[mail] Échec vérification SMTP:', err.message);
+    console.error('[mail] Vérifiez EMAIL_USER, EMAIL_PASS (mot de passe d\'application Gmail) et que "Accès aux applications moins sécurisées" est activé si nécessaire.');
+    return false;
+  }
 }
 
 async function sendVerificationEmail(to, code) {
@@ -35,7 +59,12 @@ async function sendVerificationEmail(to, code) {
     `
   };
 
-  return getTransporter().sendMail(mailOptions);
+  try {
+    return await getTransporter().sendMail(mailOptions);
+  } catch (err) {
+    console.error('[mail] Échec envoi email de vérification à', to, ':', err.message);
+    throw err;
+  }
 }
 
 async function sendPasswordResetEmail(to, code) {
@@ -80,4 +109,4 @@ async function sendPhoneVerificationSms(phone, code) {
   console.warn('[SMS] Twilio non configuré, code non envoyé:', code);
 }
 
-module.exports = { sendVerificationEmail, sendPasswordResetEmail, sendPhoneVerificationSms };
+module.exports = { sendVerificationEmail, sendPasswordResetEmail, sendPhoneVerificationSms, verifyTransporter };
