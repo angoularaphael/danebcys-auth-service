@@ -7,6 +7,18 @@ const router = Router();
 
 router.use(serviceAuth);
 
+// ─── Liste des IDs admin (pour notifications inter-services) ─────────
+router.get('/admins', async (_req, res) => {
+  try {
+    const result = await query(
+      `SELECT u.id FROM users u JOIN roles r ON u.role_id = r.id WHERE r.name = 'admin' AND u.deleted = FALSE`
+    );
+    res.json({ adminIds: result.rows.map((r) => r.id) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Validate token (existing) ──────────────────────────────────────
 router.post('/validate-token', async (req, res) => {
   try {

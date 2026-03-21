@@ -3,6 +3,8 @@ const jwt = require('../utils/jwt');
 const { query } = require('../config/database');
 const env = require('../config/env');
 
+/** Durée de vie des tokens : identique pour tous les rôles (user, admin, vendeur, assistance). */
+
 function generateAccessToken(user) {
   const tokenVersion = Number(user.tokenVersion ?? user.token_version ?? 0);
   return jwt.sign(

@@ -32,7 +32,7 @@ module.exports = {
   JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET,
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
   JWT_ACCESS_EXPIRES_IN: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
-  JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+  JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d', // Session (tous rôles) : 7 jours
 
   PEPPER_PRIMARY_URL: process.env.PEPPER_PRIMARY_URL || '',
   PEPPER_PRIMARY_KEY: process.env.PEPPER_PRIMARY_KEY || '',

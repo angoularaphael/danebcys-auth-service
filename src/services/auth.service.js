@@ -11,7 +11,10 @@ function generateCode() {
   return crypto.randomInt(100000, 999999).toString();
 }
 
-async function signup({ email, password, username, firstName, lastName, phone, country }, { userAgent, clientIp } = {}) {
+async function signup({ email, password, username, firstName, lastName, phone, country, role: roleName = 'user' }, { userAgent, clientIp } = {}) {
+  const allowedRoles = ['user', 'vendeur'];
+  const role = allowedRoles.includes(roleName) ? roleName : 'user';
+
   const existing = await query(
     'SELECT id FROM users WHERE email = $1 AND deleted = FALSE',
     [email]
@@ -28,20 +31,26 @@ async function signup({ email, password, username, firstName, lastName, phone, c
     throw new ConflictError('Ce nom d\'utilisateur est déjà pris');
   }
 
+  const roleResult = await query('SELECT id FROM roles WHERE name = $1', [role]);
+  if (roleResult.rows.length === 0) {
+    throw new Error(`Rôle "${role}" introuvable`);
+  }
+  const roleId = roleResult.rows[0].id;
+
   const pepper = getPepper();
   const { salt, hash } = await hashPassword(password, pepper);
 
   const result = await query(
-    `INSERT INTO users (username, email, phone, password_hash, salt, first_name, last_name, country)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO users (username, email, phone, password_hash, salt, first_name, last_name, country, role_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING id, username, email, phone, first_name, last_name,
                email_verified, phone_verified, role_id, token_version, premium_level,
                country, created_at`,
-    [username, email, phone || null, hash, salt, firstName || null, lastName || null, country || null]
+    [username, email, phone || null, hash, salt, firstName || null, lastName || null, country || null, roleId]
   );
 
   const user = result.rows[0];
-  user.role_name = 'user';
+  user.role_name = role;
 
   const code = generateCode();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
@@ -58,7 +67,7 @@ async function signup({ email, password, username, firstName, lastName, phone, c
   const accessToken = tokenService.generateAccessToken({
     id: user.id,
     email: user.email,
-    role: 'user',
+    role,
     tokenVersion: user.token_version
   });
   const refreshToken = tokenService.generateRefreshToken();
@@ -70,6 +79,7 @@ async function signup({ email, password, username, firstName, lastName, phone, c
   return { user: formatUser(user), accessToken, refreshToken };
 }
 
+/** Connexion : même émission de tokens et sessions pour tous les rôles (user, admin, vendeur, assistance). */
 async function login({ email, password }, { userAgent, clientIp } = {}) {
   const result = await query(
     `SELECT u.*, r.name AS role_name

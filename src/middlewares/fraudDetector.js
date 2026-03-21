@@ -1,7 +1,7 @@
 /**
  * Détection d'activité frauduleuse : trop de requêtes par minute.
  * - Seuil : FRAUD_REQUESTS_PER_MIN (défaut 20)
- * - À chaque dépassement : notification "activité_frauduleuse" aux admins
+ * - À chaque dépassement : notification "activité_frauduleuse" à l'utilisateur concerné (client/vendeur), pas aux admins
  * - Après FRAUD_BAN_AFTER_NOTIF (défaut 5) notifications : bannissement auto (soft delete)
  */
 const env = require('../config/env');
@@ -39,7 +39,9 @@ async function handleFraud(userId, userEmail, username) {
   entry.resetAt = Date.now() + 300_000;
 
   const message = `Activité frauduleuse détectée : ${userEmail || username || userId} (${entry.count}/${FRAUD_BAN_AFTER_NOTIF})`;
-  await notificationsClient.sendToAdmins('activité_frauduleuse', message);
+  await notificationsClient.callNotifications(userId, 'activité_frauduleuse', message).catch((err) =>
+    console.error('[fraud] Échec notification utilisateur:', err.message)
+  );
 
   if (entry.count >= FRAUD_BAN_AFTER_NOTIF) {
     try {

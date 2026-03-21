@@ -11,7 +11,7 @@ function extractContext(req) {
 
 async function signup(req, res, next) {
   try {
-    const { email, password, username, firstName, lastName, phone, country } = req.body;
+    const { email, password, username, firstName, lastName, phone, country, role } = req.body;
 
     if (!email || !password || !username) {
       throw new BadRequestError('email, password et username sont requis');
@@ -19,9 +19,12 @@ async function signup(req, res, next) {
     if (password.length < 8) {
       throw new BadRequestError('Le mot de passe doit contenir au moins 8 caractères');
     }
+    if (role !== undefined && role !== 'user' && role !== 'vendeur') {
+      throw new BadRequestError('role doit être "user" (client) ou "vendeur"');
+    }
 
     const result = await authService.signup(
-      { email, password, username, firstName, lastName, phone, country },
+      { email, password, username, firstName, lastName, phone, country, role: role || 'user' },
       extractContext(req)
     );
     res.status(201).json(result);
