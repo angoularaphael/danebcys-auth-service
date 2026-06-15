@@ -1,3 +1,4 @@
+// Logique métier : comptes, mots de passe, vérifications email/SMS
 const crypto = require('crypto');
 const { query } = require('../config/database');
 const env = require('../config/env');
@@ -7,10 +8,12 @@ const tokenService = require('./token.service');
 const mailService = require('./mail.service');
 const { BadRequestError, UnauthorizedError, ConflictError } = require('../utils/errors');
 
+// Génère un code à 6 chiffres pour vérifier email ou téléphone
 function generateCode() {
   return crypto.randomInt(100000, 999999).toString();
 }
 
+// Crée un compte, envoie le code par email et renvoie les jetons de connexion
 async function signup({ email, password, username, firstName, lastName, phone, country, role: roleName = 'user' }, { userAgent, clientIp } = {}) {
   const allowedRoles = ['user', 'vendeur'];
   const role = allowedRoles.includes(roleName) ? roleName : 'user';
@@ -79,7 +82,7 @@ async function signup({ email, password, username, firstName, lastName, phone, c
   return { user: formatUser(user), accessToken, refreshToken };
 }
 
-/** Connexion : même émission de tokens et sessions pour tous les rôles (user, admin, vendeur, assistance). */
+// Connecte un utilisateur et renvoie les jetons (même logique pour tous les rôles)
 async function login({ email, password }, { userAgent, clientIp } = {}) {
   const result = await query(
     `SELECT u.*, r.name AS role_name
@@ -141,6 +144,7 @@ async function login({ email, password }, { userAgent, clientIp } = {}) {
   return { user: formatUser(user), accessToken, refreshToken };
 }
 
+// Échange un refresh token contre une nouvelle paire de jetons
 async function refresh(oldRefreshToken, { userAgent, clientIp } = {}) {
   let user;
   try {
@@ -169,6 +173,7 @@ async function refresh(oldRefreshToken, { userAgent, clientIp } = {}) {
   return { accessToken, refreshToken: newRefreshToken };
 }
 
+// Déconnecte l'utilisateur et invalide ses jetons
 async function logout(refreshToken, accessToken) {
   await tokenService.revokeRefreshToken(refreshToken);
   if (accessToken) {
@@ -176,6 +181,7 @@ async function logout(refreshToken, accessToken) {
   }
 }
 
+// Récupère le profil d'un utilisateur par son identifiant
 async function getMe(userId) {
   const result = await query(
     `SELECT u.id, u.username, u.email, u.phone, u.first_name, u.last_name,
@@ -192,6 +198,7 @@ async function getMe(userId) {
   return formatUser(result.rows[0]);
 }
 
+// Valide le code email et marque l'adresse comme vérifiée
 async function verifyEmail(userId, code) {
   const result = await query(
     `SELECT * FROM email_verifications
@@ -208,6 +215,7 @@ async function verifyEmail(userId, code) {
   await query('UPDATE users SET email_verified = TRUE WHERE id = $1', [userId]);
 }
 
+// Change le mot de passe après vérification de l'ancien
 async function changePassword(userId, currentPassword, newPassword) {
   const result = await query(
     'SELECT id, password_hash, salt FROM users WHERE id = $1 AND deleted = FALSE',
@@ -229,10 +237,12 @@ async function changePassword(userId, currentPassword, newPassword) {
   await query('UPDATE users SET password_hash = $1, salt = $2 WHERE id = $3', [hash, salt, userId]);
 }
 
+// Ferme toutes les sessions sauf celle de l'appareil actuel
 async function revokeOtherSessions(userId, keepRefreshToken) {
   await tokenService.revokeOtherUserSessions(userId, keepRefreshToken);
 }
 
+// Renvoie un code de vérification email si l'adresse n'est pas encore validée
 async function resendEmailVerificationCode(userId) {
   const userResult = await query(
     'SELECT id, email, email_verified FROM users WHERE id = $1 AND deleted = FALSE',
@@ -262,6 +272,7 @@ async function resendEmailVerificationCode(userId) {
   return { message: 'Code de verification renvoye' };
 }
 
+// Transforme une ligne de base de données en objet lisible pour l'API
 function formatUser(row) {
   return {
     id: row.id,
@@ -281,6 +292,7 @@ function formatUser(row) {
   };
 }
 
+// Envoie un code par email pour réinitialiser le mot de passe (sans révéler si le compte existe)
 async function forgotPassword(email) {
   const result = await query(
     'SELECT id FROM users WHERE email = $1 AND deleted = FALSE',
@@ -303,6 +315,7 @@ async function forgotPassword(email) {
   });
 }
 
+// Change le mot de passe avec le code reçu et ferme toutes les sessions
 async function resetPassword(email, code, newPassword) {
   const result = await query(
     `SELECT pr.id AS reset_id, pr.user_id
@@ -332,6 +345,7 @@ async function resetPassword(email, code, newPassword) {
   await tokenService.bumpUserTokenVersion(user_id);
 }
 
+// Envoie un code SMS pour vérifier le numéro de téléphone
 async function requestPhoneVerification(userId) {
   const userResult = await query(
     'SELECT phone FROM users WHERE id = $1 AND deleted = FALSE',
@@ -353,6 +367,7 @@ async function requestPhoneVerification(userId) {
   });
 }
 
+// Valide le code SMS et marque le téléphone comme vérifié
 async function verifyPhone(userId, code) {
   const result = await query(
     `SELECT * FROM phone_verifications

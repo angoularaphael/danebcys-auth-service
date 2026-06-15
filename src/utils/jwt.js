@@ -1,17 +1,17 @@
+// Création et vérification des jetons JWT (implémentation maison)
 const crypto = require('crypto');
 
+// Encode des données en texte base64url (format utilisé par les jetons JWT)
 function base64UrlEncode(data) {
   return Buffer.from(data).toString('base64url');
 }
 
+// Décode du texte base64url en texte lisible
 function base64UrlDecode(str) {
   return Buffer.from(str, 'base64url').toString('utf8');
 }
 
-/**
- * Crée un JWT signé avec HMAC-SHA256.
- * Aucune librairie externe — uniquement le module crypto natif.
- */
+// Crée un jeton JWT signé (sans librairie externe)
 function sign(payload, secret, expiresIn) {
   const header = { alg: 'HS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
@@ -36,10 +36,7 @@ function sign(payload, secret, expiresIn) {
   return `${signingInput}.${signature}`;
 }
 
-/**
- * Vérifie la signature HMAC et l'expiration du token.
- * Utilise timingSafeEqual pour bloquer les attaques par timing.
- */
+// Vérifie la signature et la date d'expiration d'un jeton JWT
 function verify(token, secret) {
   const parts = token.split('.');
   if (parts.length !== 3) throw new Error('Format JWT invalide');
@@ -69,10 +66,7 @@ function verify(token, secret) {
   return payload;
 }
 
-/**
- * Décode le payload sans vérifier la signature.
- * Utilisé uniquement pour extraire l'identité dans le rate limiter.
- */
+// Lit le contenu du jeton sans vérifier la signature (pour compter les requêtes)
 function decode(token) {
   try {
     const parts = token.split('.');
@@ -83,6 +77,7 @@ function decode(token) {
   }
 }
 
+// Convertit une durée texte (ex. 15m, 7d) en secondes
 function parseDurationSec(str) {
   const match = str.match(/^(\d+)([smhd])$/);
   if (!match) return 900;

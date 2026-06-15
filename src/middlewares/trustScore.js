@@ -1,7 +1,10 @@
+// Calcule un score de confiance du navigateur et journalise les IP suspectes
 const crypto = require('crypto');
 
+// Indique si l'avertissement « secret IP manquant » a déjà été affiché
 let warnedMissingSecret = false;
 
+// Retourne la clé secrète pour masquer les adresses IP dans les journaux
 function getIpLogSecret() {
   const secret = process.env.IP_LOG_SECRET || process.env.INTER_SERVICE_KEY;
   if (!secret && !warnedMissingSecret) {
@@ -13,17 +16,20 @@ function getIpLogSecret() {
   return secret || 'dev-insecure-ip-log-secret';
 }
 
+// Transforme une adresse IP en code anonyme (impossible de retrouver l'IP d'origine)
 function hmacIp(ip) {
   const secret = getIpLogSecret();
   return crypto.createHmac('sha256', secret).update(String(ip || '')).digest('hex');
 }
 
+// Retourne le début de la tranche de 5 minutes contenant cette date
 function debutBucket5Min(date = new Date()) {
   const ms = date.getTime();
   const bucketMs = 5 * 60 * 1000;
   return new Date(Math.floor(ms / bucketMs) * bucketMs);
 }
 
+// Enregistre une adresse IP suspecte dans MongoDB (collection logsSuspects)
 async function enregistrerIpSuspecteMongo(collection, ipBrute, trust, req) {
   const maintenant = new Date();
   const bucketStart = debutBucket5Min(maintenant);
@@ -59,6 +65,7 @@ async function enregistrerIpSuspecteMongo(collection, ipBrute, trust, req) {
   );
 }
 
+// Décode une chaîne encodée en JSON
 function base64UrlDecodeToJson(valeur) {
   try {
     const b64 = String(valeur).replace(/-/g, '+').replace(/_/g, '/');
@@ -70,20 +77,24 @@ function base64UrlDecodeToJson(valeur) {
   }
 }
 
+// Nettoie une chaîne (supprime les espaces autour)
 function normaliser(str) {
   return String(str || '').trim();
 }
 
+// Vérifie si une chaîne contient un morceau de texte (sans tenir compte des majuscules)
 function contient(str, morceau) {
   return normaliser(str).toLowerCase().includes(String(morceau).toLowerCase());
 }
 
+// Extrait la langue principale demandée par le navigateur
 function extraireLanguePrincipale(acceptLanguage) {
   const brut = normaliser(acceptLanguage);
   if (!brut) return null;
   return brut.split(',')[0].trim() || null;
 }
 
+// Détecte si le navigateur ressemble à un outil automatique (curl, Postman, etc.)
 function estUserAgentSuspect(ua) {
   const x = normaliser(ua).toLowerCase();
   if (!x) return true;
@@ -96,6 +107,7 @@ function estUserAgentSuspect(ua) {
   return marqueurs.some((m) => x.includes(m));
 }
 
+// Détecte si le visiteur utilise un téléphone, iOS ou Android
 function analyserUaMobile(ua) {
   const x = normaliser(ua).toLowerCase();
   const estMobile = x.includes('mobile') || x.includes('android') || x.includes('iphone') || x.includes('ipad');
@@ -104,6 +116,7 @@ function analyserUaMobile(ua) {
   return { estMobile, estIos, estAndroid };
 }
 
+// Calcule un score de confiance (0–100) à partir des infos du navigateur
 function scoreConfianceDepuisRequete(req) {
   let score = 50;
   const raisons = [];
@@ -233,6 +246,7 @@ function scoreConfianceDepuisRequete(req) {
   return { score, niveau, raisons };
 }
 
+// Ajoute le score de confiance dans les en-têtes de réponse (x-trust-score, x-trust-level)
 function middlewareScoreConfiance(options = {}) {
   const {
     headerScore = 'x-trust-score',

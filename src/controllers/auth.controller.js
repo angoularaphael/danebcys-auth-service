@@ -1,7 +1,9 @@
+// Contrôleurs HTTP : inscription, connexion, mot de passe et profil
 const authService = require('../services/auth.service');
 const { createChallenge } = require('../middlewares/pow');
 const { BadRequestError } = require('../utils/errors');
 
+// Récupère le navigateur et l'adresse IP du visiteur pour la session
 function extractContext(req) {
   return {
     userAgent: req.headers['user-agent'] || '',
@@ -9,6 +11,7 @@ function extractContext(req) {
   };
 }
 
+// Crée un nouveau compte — POST /api/v1/auth/signup
 async function signup(req, res, next) {
   try {
     const { email, password, username, firstName, lastName, phone, country, role } = req.body;
@@ -33,6 +36,7 @@ async function signup(req, res, next) {
   }
 }
 
+// Connecte un utilisateur avec email et mot de passe — POST /api/v1/auth/login
 async function login(req, res, next) {
   try {
     const { email, password } = req.body;
@@ -51,6 +55,7 @@ async function login(req, res, next) {
   }
 }
 
+// Renouvelle les jetons de connexion — POST /api/v1/auth/refresh
 async function refresh(req, res, next) {
   try {
     const { refreshToken } = req.body;
@@ -66,6 +71,7 @@ async function refresh(req, res, next) {
   }
 }
 
+// Déconnecte l'utilisateur et invalide ses jetons — POST /api/v1/auth/logout
 async function logout(req, res, next) {
   try {
     const { refreshToken } = req.body;
@@ -81,6 +87,7 @@ async function logout(req, res, next) {
   }
 }
 
+// Renvoie les infos du compte connecté — GET /api/v1/auth/me
 async function getMe(req, res, next) {
   try {
     const user = await authService.getMe(req.user.id);
@@ -93,6 +100,7 @@ async function getMe(req, res, next) {
   }
 }
 
+// Valide le code reçu par email — POST /api/v1/auth/verify-email
 async function verifyEmail(req, res, next) {
   try {
     const { code } = req.body;
@@ -108,6 +116,7 @@ async function verifyEmail(req, res, next) {
   }
 }
 
+// Renvoie un nouveau code par email — POST /api/v1/auth/resend-email-code
 async function resendEmailCode(req, res, next) {
   try {
     const result = await authService.resendEmailVerificationCode(req.user.id);
@@ -117,11 +126,13 @@ async function resendEmailCode(req, res, next) {
   }
 }
 
+// Fournit un défi anti-robot au navigateur — GET /api/v1/auth/pow-challenge
 function getChallenge(_req, res) {
   const challenge = createChallenge();
   res.json(challenge);
 }
 
+// Envoie un code de réinitialisation par email — POST /api/v1/auth/forgot-password
 async function forgotPassword(req, res, next) {
   try {
     const { email } = req.body;
@@ -137,6 +148,7 @@ async function forgotPassword(req, res, next) {
   }
 }
 
+// Change le mot de passe avec le code reçu — POST /api/v1/auth/reset-password
 async function resetPassword(req, res, next) {
   try {
     const { email, code, newPassword } = req.body;
@@ -155,6 +167,7 @@ async function resetPassword(req, res, next) {
   }
 }
 
+// Envoie un code de vérification par SMS — POST /api/v1/auth/send-phone-code
 async function sendPhoneCode(req, res, next) {
   try {
     await authService.requestPhoneVerification(req.user.id);
@@ -164,6 +177,7 @@ async function sendPhoneCode(req, res, next) {
   }
 }
 
+// Valide le code reçu par SMS — POST /api/v1/auth/verify-phone
 async function verifyPhone(req, res, next) {
   try {
     const { code } = req.body;
@@ -176,6 +190,7 @@ async function verifyPhone(req, res, next) {
   }
 }
 
+// Change le mot de passe du compte connecté — PUT /api/v1/auth/me/password
 async function changePassword(req, res, next) {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -191,6 +206,7 @@ async function changePassword(req, res, next) {
   }
 }
 
+// Ferme toutes les autres sessions (autres appareils) — POST /api/v1/auth/me/revoke-sessions
 async function revokeOtherSessions(req, res, next) {
   try {
     const { refreshToken } = req.body;

@@ -1,3 +1,4 @@
+// Point d'entrée Auth-service : PostgreSQL, pepper, comptes seed et écoute HTTP (port 3001)
 require('dotenv').config();
 
 const app = require('./src/app');

@@ -1,6 +1,8 @@
+// Vérifie le jeton Bearer et attache l'utilisateur connecté à la requête
 const tokenService = require('../services/token.service');
 const { UnauthorizedError } = require('../utils/errors');
 
+// Vérifie que l'utilisateur est connecté (jeton Bearer obligatoire)
 async function authenticate(req, _res, next) {
   try {
     const header = req.headers.authorization;

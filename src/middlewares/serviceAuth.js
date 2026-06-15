@@ -1,11 +1,8 @@
+// Vérifie la clé X-Service-Key pour protéger les routes /internal
 const { safeCompare } = require('../utils/hash');
 const env = require('../config/env');
 
-/**
- * Authentification inter-microservices.
- * Les services internes s'authentifient via le header X-Service-Key.
- * La comparaison utilise SHA-256 + timingSafeEqual (pas de timing leak).
- */
+// Vérifie la clé secrète X-Service-Key — protège les routes /internal
 function serviceAuth(req, res, next) {
   const key = req.headers['x-service-key'];
 

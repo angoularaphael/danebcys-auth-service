@@ -1,6 +1,8 @@
+// Crée les comptes admin, vendeur et assistance au démarrage
 const { query } = require('../config/database');
 const { hashPassword } = require('../utils/hash');
 
+// Crée ou met à jour le compte super-administrateur au démarrage du service
 async function seedSuperAdmin(pepper) {
   const adminRole = await query("SELECT id FROM roles WHERE name = 'admin'");
   if (adminRole.rows.length === 0) {
@@ -39,6 +41,7 @@ async function seedSuperAdmin(pepper) {
   return { created: true, email };
 }
 
+// Crée ou met à jour les comptes vendeur et assistance de démonstration au démarrage
 async function seedVendeurAndAssistance(pepper) {
   const vendeurRole = await query("SELECT id FROM roles WHERE name = 'vendeur'");
   const assistanceRole = await query("SELECT id FROM roles WHERE name = 'assistance'");

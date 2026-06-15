@@ -1,8 +1,10 @@
+// Connexion PostgreSQL et initialisation du schéma auth_service
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 const env = require('./env');
 
+// Connexions partagées vers la base PostgreSQL auth_service
 const pool = new Pool({
   host: env.PG_HOST,
   port: env.PG_PORT,
@@ -18,6 +20,7 @@ pool.on('error', (err) => {
   console.error('[database] Erreur inattendue du pool:', err.message);
 });
 
+// Envoie une requête à la base de données PostgreSQL
 async function query(text, params) {
   const start = Date.now();
   const result = await pool.query(text, params);
@@ -28,10 +31,12 @@ async function query(text, params) {
   return result;
 }
 
+// Ouvre une connexion dédiée (utile pour plusieurs requêtes liées)
 async function getClient() {
   return pool.connect();
 }
 
+// Crée les tables au démarrage en lisant le fichier init.sql
 async function initDB() {
   const sqlPath = path.join(__dirname, '..', '..', 'init.sql');
   const sql = fs.readFileSync(sqlPath, 'utf8');

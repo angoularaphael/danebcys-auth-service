@@ -1,5 +1,7 @@
+// Authentification optionnelle ou obligatoire avant transfert vers un microservice
 const tokenService = require('../services/token.service');
 
+// Récupère le jeton de connexion dans l'en-tête Authorization
 function extractBearerToken(req) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
@@ -8,6 +10,7 @@ function extractBearerToken(req) {
   return header.slice('Bearer '.length).trim();
 }
 
+// Vérifie le jeton et enregistre l'utilisateur sur la requête (une seule fois)
 async function validateAndAttachUser(req) {
   if (req.authValidated) {
     return req.user || null;
@@ -32,6 +35,7 @@ async function validateAndAttachUser(req) {
   }
 }
 
+// Exige une connexion valide avant de transférer vers un autre service
 async function authenticateRequired(req, _res, next) {
   try {
     const token = extractBearerToken(req);
@@ -48,6 +52,7 @@ async function authenticateRequired(req, _res, next) {
   }
 }
 
+// Connecte l'utilisateur si un jeton est présent, sinon laisse passer sans connexion
 async function authenticateOptional(req, _res, next) {
   try {
     await validateAndAttachUser(req);

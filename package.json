@@ -1,7 +1,7 @@
 {
   "name": "auth-service",
   "version": "1.0.0",
-  "description": "Service d'authentification — JWT maison, double pepper, PoW, zero lib auth",
+  "description": "Service d'authentification — JWT maison, pepper externe, PoW, zero lib auth",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

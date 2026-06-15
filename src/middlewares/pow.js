@@ -1,12 +1,9 @@
+// Défi anti-robot (Proof of Work) pour inscription et connexion
 const crypto = require('crypto');
 const env = require('../config/env');
 const { BadRequestError } = require('../utils/errors');
 
-/**
- * Crée un challenge PoW signé par HMAC (stateless, pas de stockage DB).
- * Le client doit trouver un nonce tel que SHA-256(challenge + nonce)
- * commence par `difficulty` zéros hexadécimaux.
- */
+// Crée un défi anti-robot : le navigateur doit trouver une réponse difficile à calculer
 function createChallenge() {
   const timestamp = Date.now();
   const random = crypto.randomBytes(16).toString('hex');
@@ -24,10 +21,7 @@ function createChallenge() {
   };
 }
 
-/**
- * Middleware : vérifie le PoW via les headers
- * x-pow-challenge, x-pow-nonce, x-pow-signature
- */
+// Vérifie que le navigateur a bien résolu le défi anti-robot (en-têtes x-pow-*)
 function verifyPow(req, _res, next) {
   const challenge = req.headers['x-pow-challenge'];
   const nonce = req.headers['x-pow-nonce'];

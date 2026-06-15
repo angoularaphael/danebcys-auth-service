@@ -1,62 +1,30 @@
+// Récupère et conserve le pepper primaire depuis pepper-primary pour le hashage des mots de passe
 const crypto = require('crypto');
 const http = require('http');
 const env = require('../config/env');
 
-let combinedPepper = null;
+// Secret pepper en mémoire uniquement (jamais écrit sur disque par Auth-service)
+let pepper = null;
 
-/**
- * Double pepper entièrement externe :
- *  - Pepper primaire : récupéré depuis pepper-primary (microservice)
- *  - Pepper secondaire : récupéré depuis pepper-service (microservice)
- *  - Combinaison : HMAC-SHA256(primary, secondary)
- *
- * Le Auth Service ne stocke AUCUN pepper.
- * En dev, si les services sont indisponibles, fallback sur un hash déterministe.
- */
+// Récupère le pepper depuis pepper-primary au démarrage
 async function initPepper() {
-  const hasPrimary = !!env.PEPPER_PRIMARY_URL;
-  const hasSecondary = !!env.PEPPER_SECONDARY_URL;
-
-  if (!hasPrimary && !hasSecondary) {
+  if (!env.PEPPER_PRIMARY_URL) {
     if (env.NODE_ENV === 'development') {
-      console.warn('[pepper] Aucun Pepper Service configuré — fallback dev');
-      combinedPepper = crypto.createHash('sha256').update('dev-fallback-pepper').digest('hex');
+      console.warn('[pepper] Aucun pepper service configuré — fallback dev');
+      pepper = crypto.createHash('sha256').update('dev-fallback-pepper').digest('hex');
       return;
     }
-    throw new Error('PEPPER_PRIMARY_URL et PEPPER_SECONDARY_URL requis en production');
+    throw new Error('PEPPER_PRIMARY_URL requis en production');
   }
 
   try {
-    const results = await Promise.all([
-      hasPrimary
-        ? fetchPepper(env.PEPPER_PRIMARY_URL, env.PEPPER_PRIMARY_KEY, 'Primary')
-        : null,
-      hasSecondary
-        ? fetchPepper(env.PEPPER_SECONDARY_URL, env.PEPPER_SECONDARY_KEY, 'Secondary')
-        : null
-    ]);
-
-    const primary = results[0];
-    const secondary = results[1];
-
-    if (primary && secondary) {
-      combinedPepper = crypto
-        .createHmac('sha256', primary)
-        .update(secondary)
-        .digest('hex');
-      console.log('[pepper] Double pepper initialisé (primary + secondary)');
-    } else if (primary) {
-      combinedPepper = crypto.createHash('sha256').update(primary).digest('hex');
-      console.warn('[pepper] Seul le pepper primaire est disponible');
-    } else {
-      combinedPepper = crypto.createHash('sha256').update(secondary).digest('hex');
-      console.warn('[pepper] Seul le pepper secondaire est disponible');
-    }
+    pepper = await fetchPepper(env.PEPPER_PRIMARY_URL, env.PEPPER_PRIMARY_KEY, 'Primary');
+    console.log('[pepper] Pepper externe initialisé');
   } catch (err) {
     if (env.NODE_ENV === 'development') {
       console.error('[pepper] Erreur:', err.message);
       console.warn('[pepper] Fallback dev activé');
-      combinedPepper = crypto.createHash('sha256').update('dev-fallback-pepper').digest('hex');
+      pepper = crypto.createHash('sha256').update('dev-fallback-pepper').digest('hex');
     } else {
       throw err;
     }
@@ -64,10 +32,10 @@ async function initPepper() {
 }
 
 function getPepper() {
-  if (!combinedPepper) {
+  if (!pepper) {
     throw new Error('Pepper non initialisé — appelez initPepper() au démarrage');
   }
-  return combinedPepper;
+  return pepper;
 }
 
 function fetchPepper(baseUrl, serviceKey, label) {
@@ -81,7 +49,7 @@ function fetchPepper(baseUrl, serviceKey, label) {
       method: 'GET',
       headers: {
         'X-Service-Key': serviceKey,
-        'Accept': 'application/json'
+        Accept: 'application/json'
       }
     };
 

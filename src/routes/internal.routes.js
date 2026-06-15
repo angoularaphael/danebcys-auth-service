@@ -1,3 +1,4 @@
+// Routes réservées aux autres microservices — montées sur /internal
 const { Router } = require('express');
 const { serviceAuth } = require('../middlewares/serviceAuth');
 const tokenService = require('../services/token.service');
@@ -7,7 +8,7 @@ const router = Router();
 
 router.use(serviceAuth);
 
-// ─── Liste des IDs admin (pour notifications inter-services) ─────────
+// Liste les identifiants des administrateurs — GET /internal/admins
 router.get('/admins', async (_req, res) => {
   try {
     const result = await query(
@@ -19,7 +20,7 @@ router.get('/admins', async (_req, res) => {
   }
 });
 
-// ─── Validate token (existing) ──────────────────────────────────────
+// Vérifie un jeton de connexion et renvoie l'utilisateur — POST /internal/validate-token
 router.post('/validate-token', async (req, res) => {
   try {
     const { accessToken } = req.body;
@@ -34,7 +35,7 @@ router.post('/validate-token', async (req, res) => {
   }
 });
 
-// ─── List users (pagination, search, filters) ──────────────────────
+// Liste les utilisateurs avec recherche et pagination — GET /internal/users
 router.get('/users', async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -49,7 +50,7 @@ router.get('/users', async (req, res) => {
     if (deleted === 'true') {
       where.push(`u.deleted = TRUE`);
     } else if (deleted === 'all') {
-      // no filter
+      // Pas de filtre sur les comptes supprimés
     } else {
       where.push(`u.deleted = FALSE`);
     }
@@ -96,7 +97,7 @@ router.get('/users', async (req, res) => {
   }
 });
 
-// ─── Get user by ID ─────────────────────────────────────────────────
+// Récupère un utilisateur par identifiant — GET /internal/users/:id
 router.get('/users/:id', async (req, res) => {
   try {
     const result = await query(
@@ -120,7 +121,7 @@ router.get('/users/:id', async (req, res) => {
   }
 });
 
-// ─── Update user profile ────────────────────────────────────────────
+// Met à jour le profil d'un utilisateur — PUT /internal/users/:id
 router.put('/users/:id', async (req, res) => {
   try {
     const { username, firstName, lastName, phone, country } = req.body;
@@ -163,7 +164,7 @@ router.put('/users/:id', async (req, res) => {
   }
 });
 
-// ─── Update user role ───────────────────────────────────────────────
+// Change le rôle d'un utilisateur — PUT /internal/users/:id/role
 router.put('/users/:id/role', async (req, res) => {
   try {
     const { roleId } = req.body;
@@ -190,7 +191,7 @@ router.put('/users/:id/role', async (req, res) => {
   }
 });
 
-// ─── Update premium level ───────────────────────────────────────────
+// Met à jour le niveau premium d'un utilisateur — PUT /internal/users/:id/premium
 router.put('/users/:id/premium', async (req, res) => {
   try {
     const { premiumLevel, studentProof } = req.body;
@@ -227,7 +228,7 @@ router.put('/users/:id/premium', async (req, res) => {
   }
 });
 
-// ─── Soft delete user ───────────────────────────────────────────────
+// Désactive un compte sans effacer les données — DELETE /internal/users/:id
 router.delete('/users/:id', async (req, res) => {
   try {
     const result = await query(
@@ -245,7 +246,7 @@ router.delete('/users/:id', async (req, res) => {
   }
 });
 
-// ─── Restore soft-deleted user ──────────────────────────────────────
+// Réactive un compte précédemment désactivé — PUT /internal/users/:id/restore
 router.put('/users/:id/restore', async (req, res) => {
   try {
     const result = await query(
@@ -269,7 +270,7 @@ router.put('/users/:id/restore', async (req, res) => {
   }
 });
 
-// ─── List roles ─────────────────────────────────────────────────────
+// Liste tous les rôles disponibles — GET /internal/roles
 router.get('/roles', async (_req, res) => {
   try {
     const result = await query('SELECT id, name, description FROM roles ORDER BY id');

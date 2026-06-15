@@ -1,10 +1,12 @@
+// Gestion des jetons JWT : création, validation et sessions
 const crypto = require('crypto');
 const jwt = require('../utils/jwt');
 const { query } = require('../config/database');
 const env = require('../config/env');
 
-/** Durée de vie des tokens : identique pour tous les rôles (user, admin, vendeur, assistance). */
+// Durée de vie des jetons identique pour tous les rôles (client, admin, vendeur, assistance)
 
+// Crée un jeton de connexion court (access token) pour l'utilisateur
 function generateAccessToken(user) {
   const tokenVersion = Number(user.tokenVersion ?? user.token_version ?? 0);
   return jwt.sign(
@@ -20,14 +22,17 @@ function generateAccessToken(user) {
   );
 }
 
+// Crée un jeton de renouvellement long (refresh token) aléatoire
 function generateRefreshToken() {
   return crypto.randomBytes(40).toString('hex');
 }
 
+// Vérifie la signature et la date d'expiration d'un access token
 function verifyAccessToken(token) {
   return jwt.verify(token, env.JWT_ACCESS_SECRET);
 }
 
+// Vérifie le jeton en profondeur : signature, liste noire, version et compte actif
 async function validateAccessToken(token) {
   const payload = verifyAccessToken(token);
 
@@ -69,10 +74,12 @@ async function validateAccessToken(token) {
   };
 }
 
+// Transforme un jeton en empreinte pour le stocker en base sans exposer le jeton
 function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
+// Enregistre une session de renouvellement en base PostgreSQL
 async function storeRefreshToken(userId, token, { fingerprintHash, ipAddress } = {}) {
   const tokenHash = hashToken(token);
   const expiresAt = new Date(Date.now() + parseDurationMs(env.JWT_REFRESH_EXPIRES_IN));
@@ -84,16 +91,7 @@ async function storeRefreshToken(userId, token, { fingerprintHash, ipAddress } =
   );
 }
 
-/**
- * Rotation de token avec détection de réutilisation (CDC 4.2).
- *
- * Flux :
- *  1. Le token existe et n'est PAS invalidated → on le marque invalidated, on retourne le user
- *  2. Le token existe et EST invalidated → réutilisation détectée !
- *     → on supprime TOUS les tokens du user (toutes ses sessions)
- *     → on lance TOKEN_REUSE_DETECTED
- *  3. Le token n'existe pas ou est expiré → retourne null
- */
+// Échange un refresh token contre un nouveau — détecte la réutilisation frauduleuse
 async function rotateRefreshToken(token) {
   const tokenHash = hashToken(token);
 
@@ -135,20 +133,24 @@ async function rotateRefreshToken(token) {
   };
 }
 
+// Supprime une session de renouvellement (déconnexion)
 async function revokeRefreshToken(token) {
   const tokenHash = hashToken(token);
   await query('DELETE FROM sessions WHERE token_hash = $1', [tokenHash]);
 }
 
+// Ferme toutes les sessions d'un utilisateur
 async function revokeAllUserTokens(userId) {
   await query('DELETE FROM sessions WHERE user_id = $1', [userId]);
 }
 
+// Ferme toutes les sessions sauf celle de l'appareil actuel
 async function revokeOtherUserSessions(userId, keepRefreshToken) {
   const keepHash = hashToken(keepRefreshToken);
   await query('DELETE FROM sessions WHERE user_id = $1 AND token_hash != $2', [userId, keepHash]);
 }
 
+// Vérifie si un access token a été invalidé (liste noire)
 async function isAccessTokenRevoked(tokenJti) {
   const result = await query(
     `SELECT 1
@@ -161,6 +163,7 @@ async function isAccessTokenRevoked(tokenJti) {
   return result.rows.length > 0;
 }
 
+// Invalide un access token jusqu'à sa date d'expiration naturelle
 async function revokeAccessToken(token, reason = 'logout') {
   const payload = verifyAccessToken(token);
 
@@ -184,6 +187,7 @@ async function revokeAccessToken(token, reason = 'logout') {
   );
 }
 
+// Incrémente la version du jeton pour invalider tous les access tokens existants
 async function bumpUserTokenVersion(userId) {
   const result = await query(
     `UPDATE users
@@ -196,6 +200,7 @@ async function bumpUserTokenVersion(userId) {
   return result.rows[0]?.token_version ?? null;
 }
 
+// Convertit une durée texte (ex. 7d, 15m) en millisecondes
 function parseDurationMs(duration) {
   const match = duration.match(/^(\d+)([smhd])$/);
   if (!match) return 7 * 24 * 60 * 60 * 1000;

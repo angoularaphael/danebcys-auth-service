@@ -1,11 +1,10 @@
+// Hashage scrypt des mots de passe avec pepper et comparaison sécurisée
 const crypto = require('crypto');
 
+// Réglages pour chiffrer les mots de passe (algorithme scrypt)
 const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1, keyLength: 64 };
 
-/**
- * Hash un mot de passe avec scrypt + salt + pepper.
- * Retourne { salt, hash } séparément (CDC : salt stocké en colonne dédiée).
- */
+// Chiffre un mot de passe avec un sel et une clé secrète (pepper)
 function hashPassword(password, pepper) {
   return new Promise((resolve, reject) => {
     const salt = crypto.randomBytes(32).toString('hex');
@@ -22,10 +21,7 @@ function hashPassword(password, pepper) {
   });
 }
 
-/**
- * Vérifie un mot de passe contre un hash stocké, avec timing-safe compare.
- * Le salt est fourni séparément (colonne dédiée en DB).
- */
+// Vérifie si un mot de passe correspond au hash stocké en base
 function verifyPassword(password, storedHash, salt, pepper) {
   return new Promise((resolve, reject) => {
     const input = `${password}${pepper}`;
@@ -42,19 +38,14 @@ function verifyPassword(password, storedHash, salt, pepper) {
   });
 }
 
-/**
- * Comparaison timing-safe universelle (longueur variable).
- * On hash les deux valeurs en SHA-256 pour garantir des buffers de même taille.
- */
+// Compare deux textes secrets sans révéler leur contenu par le temps de réponse
 function safeCompare(a, b) {
   const hashA = crypto.createHash('sha256').update(String(a)).digest();
   const hashB = crypto.createHash('sha256').update(String(b)).digest();
   return crypto.timingSafeEqual(hashA, hashB);
 }
 
-/**
- * Crée un fingerprint à partir du User-Agent (CDC 4.2 : hash user-agent).
- */
+// Crée une empreinte unique du navigateur à partir de son identifiant (User-Agent)
 function createFingerprint(userAgent) {
   if (!userAgent) return null;
   return crypto.createHash('sha256').update(userAgent).digest('hex');

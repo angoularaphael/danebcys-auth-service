@@ -1,9 +1,13 @@
+// Envoi d'emails via Gmail (vérification, réinitialisation mot de passe)
 const nodemailer = require('nodemailer');
 const env = require('../config/env');
 
+// Connexion Gmail pour envoyer les emails (créée à la première utilisation)
 let transporter = null;
+// Indique si la connexion Gmail a été testée avec succès
 let verified = false;
 
+// Prépare l'envoi d'emails via Gmail
 function getTransporter() {
   if (!transporter) {
     if (!env.EMAIL_USER || !env.EMAIL_PASS) {
@@ -21,10 +25,7 @@ function getTransporter() {
   return transporter;
 }
 
-/**
- * Vérifie la connexion SMTP au démarrage ou à la première utilisation.
- * Log une erreur claire si la configuration est incorrecte.
- */
+// Teste la connexion Gmail au démarrage
 async function verifyTransporter() {
   if (verified) return true;
   try {
@@ -40,6 +41,7 @@ async function verifyTransporter() {
   }
 }
 
+// Envoie un email avec le code de vérification d'adresse (6 chiffres)
 async function sendVerificationEmail(to, code) {
   const mailOptions = {
     from: `"DANEBCYS" <${env.EMAIL_USER}>`,
@@ -67,6 +69,7 @@ async function sendVerificationEmail(to, code) {
   }
 }
 
+// Envoie un email avec le code de réinitialisation de mot de passe
 async function sendPasswordResetEmail(to, code) {
   const mailOptions = {
     from: `"DANEBCYS" <${env.EMAIL_USER}>`,
@@ -89,10 +92,7 @@ async function sendPasswordResetEmail(to, code) {
   return getTransporter().sendMail(mailOptions);
 }
 
-/**
- * Stub SMS : en développement le code est loggé en console.
- * En production, remplacer par Twilio (CDC 2.4 / 6.1).
- */
+// Envoie un SMS de vérification — en développement, le code s'affiche dans la console
 async function sendPhoneVerificationSms(phone, code) {
   if (env.NODE_ENV === 'development') {
     console.log(`[SMS STUB] Code de vérification pour ${phone} : ${code}`);

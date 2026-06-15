@@ -1,9 +1,11 @@
+// Routes /api/v1/auth : inscription, connexion, jetons et vérifications
 const { Router } = require('express');
 const controller = require('../controllers/auth.controller');
 const { authenticate } = require('../middlewares/auth');
 const { verifyPow } = require('../middlewares/pow');
 const { tokenLimiter, preAuthTokenLimiter, challengeLimiter } = require('../middlewares/rateLimiter');
 
+// Routes de connexion, inscription, mot de passe — montées sur /api/v1/auth
 const router = Router();
 
 router.get('/pow-challenge', challengeLimiter, controller.getChallenge);

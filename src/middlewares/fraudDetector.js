@@ -1,18 +1,18 @@
-/**
- * Détection d'activité frauduleuse : trop de requêtes par minute.
- * - Seuil : FRAUD_REQUESTS_PER_MIN (défaut 20)
- * - À chaque dépassement : notification "activité_frauduleuse" à l'utilisateur concerné (client/vendeur), pas aux admins
- * - Après FRAUD_BAN_AFTER_NOTIF (défaut 5) notifications : bannissement auto (soft delete)
- */
+// Surveille les utilisateurs qui font trop de modifications en peu de temps
 const env = require('../config/env');
 const { query } = require('../config/database');
-const notificationsClient = require('../services/notificationsClient');
+const { sendToAdmins } = require('../services/notificationsClient');
 
-const FRAUD_REQUESTS_PER_MIN = env.FRAUD_REQUESTS_PER_MIN || 20;
+// Nombre max de modifications par minute avant alerte
+const FRAUD_REQUESTS_PER_MIN = env.FRAUD_REQUESTS_PER_MIN || 80;
+// Nombre d'alertes avant bannissement automatique du compte
 const FRAUD_BAN_AFTER_NOTIF = env.FRAUD_BAN_AFTER_NOTIF || 5;
+// Durée de la fenêtre de comptage (1 minute)
 const WINDOW_MS = 60_000;
 
+// Compte les modifications récentes par utilisateur (en mémoire)
 const requestCounts = new Map();
+// Compte les alertes fraude par utilisateur (en mémoire)
 const fraudCounts = new Map();
 
 setInterval(() => {
@@ -25,10 +25,12 @@ setInterval(() => {
   }
 }, 60_000).unref();
 
+// Marque le compte comme supprimé dans PostgreSQL (sans effacer les données)
 async function softDeleteUser(userId) {
   await query('UPDATE users SET deleted = TRUE WHERE id = $1 AND deleted = FALSE', [userId]);
 }
 
+// Prévient les admins puis bannit le compte si trop d'alertes — appelle Communication-service port 3006
 async function handleFraud(userId, userEmail, username) {
   let entry = fraudCounts.get(userId);
   if (!entry) {
@@ -38,9 +40,9 @@ async function handleFraud(userId, userEmail, username) {
   entry.count++;
   entry.resetAt = Date.now() + 300_000;
 
-  const message = `Activité frauduleuse détectée : ${userEmail || username || userId} (${entry.count}/${FRAUD_BAN_AFTER_NOTIF})`;
-  await notificationsClient.callNotifications(userId, 'activité_frauduleuse', message).catch((err) =>
-    console.error('[fraud] Échec notification utilisateur:', err.message)
+  const message = `Activité suspecte détectée : ${userEmail || username || userId} (${entry.count}/${FRAUD_BAN_AFTER_NOTIF})`;
+  await sendToAdmins('activité_frauduleuse', message).catch((err) =>
+    console.error('[fraud] Échec notification admins:', err.message)
   );
 
   if (entry.count >= FRAUD_BAN_AFTER_NOTIF) {
@@ -54,9 +56,12 @@ async function handleFraud(userId, userEmail, username) {
   }
 }
 
+// Compte les modifications (pas les lectures) et déclenche une alerte si seuil dépassé
 function fraudDetector(req, res, next) {
   const user = req.user;
   if (!user || !user.id) return next();
+  // Les lectures simples (GET) ne comptent pas — évite les faux positifs
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
 
   const userId = user.id;
   const now = Date.now();

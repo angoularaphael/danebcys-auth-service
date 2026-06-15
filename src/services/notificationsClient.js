@@ -1,10 +1,12 @@
+// Client HTTP vers Communication-service pour les notifications
 const http = require('http');
 const https = require('https');
 const env = require('../config/env');
 
+// Appelle Communication-service (port 3006) pour créer une notification
 function callNotifications(userId, type, message) {
   return new Promise((resolve, reject) => {
-    const baseUrl = env.NOTIFICATIONS_SERVICE_URL || 'http://localhost:3010';
+    const baseUrl = env.NOTIFICATIONS_SERVICE_URL || 'http://localhost:3006';
     const url = new URL(baseUrl + '/internal/notifications');
     const transport = url.protocol === 'https:' ? https : http;
 
@@ -45,6 +47,7 @@ function callNotifications(userId, type, message) {
   });
 }
 
+// Envoie une notification à tous les administrateurs — appelle Communication-service port 3006
 async function sendToAdmins(type, message) {
   const { query } = require('../config/database');
   try {

@@ -1,7 +1,9 @@
+// Transfère les requêtes du frontend vers les autres microservices
 const http = require('http');
 const https = require('https');
 const env = require('../config/env');
 
+// En-têtes techniques à ne pas recopier entre le client et le microservice
 const HOP_BY_HOP_HEADERS = new Set([
   'connection',
   'keep-alive',
@@ -15,6 +17,7 @@ const HOP_BY_HOP_HEADERS = new Set([
   'content-length'
 ]);
 
+// En-têtes que seul le gateway peut ajouter — on les retire des requêtes client
 const STRIPPED_CLIENT_HEADERS = new Set([
   'x-service-key',
   'x-user-id',
@@ -24,6 +27,7 @@ const STRIPPED_CLIENT_HEADERS = new Set([
   'x-gateway-authenticated'
 ]);
 
+// Prépare les en-têtes à envoyer au microservice (avec l'identité de l'utilisateur si connecté)
 function buildForwardHeaders(req, payload) {
   const headers = {};
 
@@ -56,6 +60,7 @@ function buildForwardHeaders(req, payload) {
   return headers;
 }
 
+// Recopie les en-têtes de la réponse du microservice vers le client
 function copyResponseHeaders(upstream, res) {
   for (const [name, value] of Object.entries(upstream.headers)) {
     if (HOP_BY_HOP_HEADERS.has(name.toLowerCase())) {
@@ -67,6 +72,7 @@ function copyResponseHeaders(upstream, res) {
   }
 }
 
+// Transforme le corps de la requête en JSON pour les envois POST, PUT, etc.
 function createPayload(req) {
   if (req.method === 'GET' || req.method === 'HEAD') {
     return null;
@@ -79,6 +85,7 @@ function createPayload(req) {
   return JSON.stringify(req.body);
 }
 
+// Reçoit la requête du frontend et la transfère vers un autre microservice
 function proxyTo(targetBaseUrl) {
   return async function proxyHandler(req, res, next) {
     try {
