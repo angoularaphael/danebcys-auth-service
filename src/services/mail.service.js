@@ -109,4 +109,81 @@ async function sendPhoneVerificationSms(phone, code) {
   console.warn('[SMS] Twilio non configuré, code non envoyé:', code);
 }
 
-module.exports = { sendVerificationEmail, sendPasswordResetEmail, sendPhoneVerificationSms, verifyTransporter };
+function formatSecurityEmailHtml({ title, intro, rows }) {
+  const rowsHtml = rows
+    .map(
+      ({ label, value }) =>
+        `<tr><td style="padding:8px 12px;color:#666;vertical-align:top;">${label}</td>`
+        + `<td style="padding:8px 12px;font-weight:600;">${value}</td></tr>`
+    )
+    .join('');
+
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto; padding: 24px;">
+      <h2 style="color: #333;">${title}</h2>
+      <p>${intro}</p>
+      <table style="width:100%;border-collapse:collapse;background:#f9f9f9;border-radius:8px;margin:16px 0;">
+        ${rowsHtml}
+      </table>
+      <p style="color: #888; font-size: 12px;">Si vous n'êtes pas à l'origine de cette activité, changez votre mot de passe et contactez l'assistance.</p>
+    </div>
+  `;
+}
+
+// Alerte : nouvelle connexion réussie (navigateur, IP, position approximative)
+async function sendLoginAlertEmail(to, { browser, ip, location, loginAt }) {
+  const mailOptions = {
+    from: `"DANEBCYS Sécurité" <${env.EMAIL_USER}>`,
+    to,
+    subject: 'Nouvelle connexion à votre compte DANEBCYS',
+    html: formatSecurityEmailHtml({
+      title: 'Connexion détectée',
+      intro: 'Une connexion vient d\'être effectuée sur votre compte :',
+      rows: [
+        { label: 'Date', value: loginAt },
+        { label: 'Navigateur', value: browser || 'Inconnu' },
+        { label: 'Adresse IP', value: ip || 'Inconnue' },
+        { label: 'Position approx.', value: location || 'Non disponible' }
+      ]
+    })
+  };
+
+  try {
+    return await getTransporter().sendMail(mailOptions);
+  } catch (err) {
+    console.error('[mail] Échec alerte connexion à', to, ':', err.message);
+  }
+}
+
+// Alerte : 5 échecs de mot de passe — IP bloquée
+async function sendLoginBlockedEmail(to, { ip, attempts, blockMinutes }) {
+  const mailOptions = {
+    from: `"DANEBCYS Sécurité" <${env.EMAIL_USER}>`,
+    to,
+    subject: 'Alerte sécurité : tentatives de connexion échouées',
+    html: formatSecurityEmailHtml({
+      title: 'Adresse IP bloquée',
+      intro: `${attempts} tentatives de connexion avec un mot de passe incorrect ont été détectées. L'adresse IP a été temporairement bloquée.`,
+      rows: [
+        { label: 'Adresse IP', value: ip || 'Inconnue' },
+        { label: 'Durée du blocage', value: `Environ ${blockMinutes} minute(s)` },
+        { label: 'Compte concerné', value: to }
+      ]
+    })
+  };
+
+  try {
+    return await getTransporter().sendMail(mailOptions);
+  } catch (err) {
+    console.error('[mail] Échec alerte blocage IP à', to, ':', err.message);
+  }
+}
+
+module.exports = {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+  sendPhoneVerificationSms,
+  sendLoginAlertEmail,
+  sendLoginBlockedEmail,
+  verifyTransporter
+};

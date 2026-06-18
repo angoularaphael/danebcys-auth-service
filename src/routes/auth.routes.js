@@ -4,6 +4,7 @@ const controller = require('../controllers/auth.controller');
 const { authenticate } = require('../middlewares/auth');
 const { verifyPow } = require('../middlewares/pow');
 const { tokenLimiter, preAuthTokenLimiter, challengeLimiter } = require('../middlewares/rateLimiter');
+const { loginIpGuard } = require('../middlewares/loginIpGuard');
 
 // Routes de connexion, inscription, mot de passe — montées sur /api/v1/auth
 const router = Router();
@@ -11,7 +12,7 @@ const router = Router();
 router.get('/pow-challenge', challengeLimiter, controller.getChallenge);
 
 router.post('/signup', verifyPow, controller.signup);
-router.post('/login', verifyPow, controller.login);
+router.post('/login', loginIpGuard, verifyPow, controller.login);
 router.post('/forgot-password', verifyPow, controller.forgotPassword);
 router.post('/reset-password', verifyPow, controller.resetPassword);
 

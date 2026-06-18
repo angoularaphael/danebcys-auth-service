@@ -6,7 +6,10 @@ const { hashPassword, verifyPassword, createFingerprint } = require('../utils/ha
 const { getPepper } = require('./pepper.service');
 const tokenService = require('./token.service');
 const mailService = require('./mail.service');
-const { BadRequestError, UnauthorizedError, ConflictError } = require('../utils/errors');
+const loginSecurity = require('./loginSecurity.service');
+const { lookupIpLocation } = require('./geoip.service');
+const { parseUserAgent } = require('../utils/browser');
+const { BadRequestError, UnauthorizedError, ConflictError, ForbiddenError } = require('../utils/errors');
 
 // Génère un code à 6 chiffres pour vérifier email ou téléphone
 function generateCode() {
@@ -84,6 +87,12 @@ async function signup({ email, password, username, firstName, lastName, phone, c
 
 // Connecte un utilisateur et renvoie les jetons (même logique pour tous les rôles)
 async function login({ email, password }, { userAgent, clientIp } = {}) {
+  if (clientIp && loginSecurity.isIpBlocked(clientIp)) {
+    throw new ForbiddenError(
+      `Adresse IP temporairement bloquée après ${loginSecurity.MAX_ATTEMPTS} tentatives de connexion échouées.`
+    );
+  }
+
   const result = await query(
     `SELECT u.*, r.name AS role_name
      FROM users u
@@ -92,8 +101,29 @@ async function login({ email, password }, { userAgent, clientIp } = {}) {
     [email]
   );
 
+  const loginFailed = async () => {
+    const fail = loginSecurity.recordFailedLogin(clientIp, email);
+    if (fail.blocked && email) {
+      const account = await query(
+        'SELECT id FROM users WHERE email = $1 AND deleted = FALSE',
+        [email]
+      );
+      if (account.rows.length > 0) {
+        mailService.sendLoginBlockedEmail(email, {
+          ip: clientIp,
+          attempts: fail.attempts,
+          blockMinutes: Math.ceil(loginSecurity.BLOCK_MS / 60_000)
+        }).catch((err) => console.error('[auth] Alerte blocage IP:', err.message));
+      }
+    }
+    const hint = fail.remaining > 0 && fail.remaining < loginSecurity.MAX_ATTEMPTS
+      ? ` (${fail.remaining} tentative(s) restante(s) avant blocage de l'adresse IP)`
+      : '';
+    throw new UnauthorizedError(`Email ou mot de passe incorrect${hint}`);
+  };
+
   if (result.rows.length === 0) {
-    throw new UnauthorizedError('Email ou mot de passe incorrect');
+    await loginFailed();
   }
 
   const user = result.rows[0];
@@ -108,8 +138,10 @@ async function login({ email, password }, { userAgent, clientIp } = {}) {
   const valid = await verifyPassword(password, user.password_hash, user.salt, pepper);
 
   if (!valid) {
-    throw new UnauthorizedError('Email ou mot de passe incorrect');
+    await loginFailed();
   }
+
+  loginSecurity.recordSuccessfulLogin(clientIp);
 
   if (!user.email_verified) {
     const code = generateCode();
@@ -140,6 +172,16 @@ async function login({ email, password }, { userAgent, clientIp } = {}) {
     fingerprintHash,
     ipAddress: clientIp
   });
+
+  const browser = parseUserAgent(userAgent);
+  lookupIpLocation(clientIp).then((location) => {
+    mailService.sendLoginAlertEmail(user.email, {
+      browser,
+      ip: clientIp,
+      location,
+      loginAt: new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })
+    });
+  }).catch((err) => console.error('[auth] Alerte connexion:', err.message));
 
   return { user: formatUser(user), accessToken, refreshToken };
 }

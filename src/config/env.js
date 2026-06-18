@@ -68,6 +68,13 @@ module.exports = {
   // Clé partagée entre les microservices (en-tête X-Service-Key)
   INTER_SERVICE_KEY: process.env.INTER_SERVICE_KEY,
 
+  // Limite les tentatives de connexion échouées avant blocage IP
+  LOGIN_MAX_ATTEMPTS: parseInt(process.env.LOGIN_MAX_ATTEMPTS, 10) || 5,
+  // Fenêtre de comptage des échecs (15 min par défaut)
+  LOGIN_ATTEMPT_WINDOW_MS: parseInt(process.env.LOGIN_ATTEMPT_WINDOW_MS, 10) || 900_000,
+  // Durée du blocage IP après 5 échecs (30 min par défaut)
+  LOGIN_IP_BLOCK_MS: parseInt(process.env.LOGIN_IP_BLOCK_MS, 10) || 1_800_000,
+
   // Email d'assistance affiché aux utilisateurs bannis
   ASSISTANCE_EMAIL: process.env.ASSISTANCE_EMAIL || 'angoularaphael05@gmail.com',
 
